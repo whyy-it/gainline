@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1714">
+<title>Gainline Rugby Projections</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: phone-first. Sticky masthead + scrollable tab strip; one column of compact cards; 2-3 columns from 720px. */
+:root{
+  --bg:#f2f4f0; --surface:#fff; --ink:#111a16; --muted:#64716a; --line:#e2e7e1; --soft:#f6f8f5;
+  --accent:#16734a; --accent-ink:#fff; --draw:#b7c0ba;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1411; --surface:#151f1b; --ink:#e8eeea; --muted:#94a39b; --line:#24312b; --soft:#1a2621;
+  --accent:#3fb37a; --accent-ink:#06120c; --draw:#4a5751; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0d1411; --surface:#151f1b; --ink:#e8eeea; --muted:#94a39b; --line:#24312b; --soft:#1a2621;
+  --accent:#3fb37a; --accent-ink:#06120c; --draw:#4a5751; color-scheme:dark;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--body);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;padding:0 max(14px,env(safe-area-inset-left)) 0 max(14px,env(safe-area-inset-right))}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.mast{display:flex;align-items:center;gap:10px;height:46px}
+.logo{font:700 24px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
+.logo span{color:var(--accent)}
+.upd{margin-left:auto;font-size:11px;color:var(--muted)}
+nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 -4px}
+nav::-webkit-scrollbar{display:none}
+nav a{flex:none;font:600 14px/1 var(--display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-decoration:none;padding:9px 8px 10px;border-bottom:2.5px solid transparent}
+nav a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+main{padding:16px 0 calc(28px + env(safe-area-inset-bottom))}
+.eyebrow{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.h1{font:700 22px/1.05 var(--display);text-transform:uppercase;margin:0 0 4px;text-wrap:balance}
+.sub{color:var(--muted);font-size:12.5px;margin:0 0 14px;max-width:62ch}
+.grid{display:grid;gap:10px}
+@media (min-width:720px){.grid{grid-template-columns:repeat(2,1fr)} .eyebrow{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.h1{font-size:28px}}
+@media (min-width:1020px){.grid.three{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+/* match card */
+.m-top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:10px 12px 0}
+.m-teams{padding:6px 12px 4px}
+.trow{display:grid;grid-template-columns:28px 1fr auto 46px;align-items:center;gap:8px;height:34px}
+.trow .nm{font:700 19px/1 var(--display);text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .sc{font:700 22px/1 var(--display);min-width:26px;text-align:right}
+.trow .wp{font:600 13px/1 var(--body);text-align:right;padding:4px 0;border-radius:6px}
+.trow.fav .wp{color:var(--c);}
+.trow:not(.fav) .nm,.trow:not(.fav) .sc{color:var(--muted)}
+.bar{display:flex;height:6px;margin:6px 12px 0;border-radius:3px;overflow:hidden;background:var(--line)}
+.bar i{display:block}
+.drawl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);padding:4px 12px 0}
+.vs{display:grid;grid-template-columns:auto 1fr 1fr;margin-top:10px;border-top:1px solid var(--line);background:var(--soft);font-size:12.5px}
+.vs > div{padding:7px 12px;border-bottom:1px solid var(--line)}
+.vs > div:nth-last-child(-n+3){border-bottom:0}
+.vs .hd{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-top:8px;padding-bottom:6px}
+.vs .r{text-align:right;white-space:nowrap}
+.vs .lab{color:var(--muted)}
+.vs small{color:var(--muted);font-size:10.5px;margin-left:3px}
+.flag{border-radius:2px;box-shadow:0 0 0 1px var(--line);display:block}
+.badge{display:block}
+/* list rows (try scorers, ratings, grades) */
+.filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -14px 10px;padding:0 14px}
+.filters::-webkit-scrollbar{display:none}
+.filters button{flex:none;display:inline-flex;align-items:center;gap:6px;font:500 12.5px var(--body);height:30px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.row{display:grid;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);min-height:48px}
+.row:last-child{border-bottom:0}
+.row > *{min-width:0}
+.row .t1{font-weight:600;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .t2{font-size:11.5px;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .big{font:700 19px/1 var(--display);text-align:right;white-space:nowrap}
+.row .big small{display:block;font:500 10.5px var(--body);color:var(--muted);margin-top:3px}
+.tr{grid-template-columns:22px minmax(0,1fr) 64px 50px}
+.meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%}
+.rk{grid-template-columns:18px 24px minmax(0,1fr) 70px 50px}
+.rk .n{color:var(--muted);font-size:12px;text-align:right}
+.gd{grid-template-columns:42px minmax(0,1fr) 50px}
+.grade{display:grid;place-items:center;height:32px;border-radius:8px;font:700 18px/1 var(--display);color:#fff}
+.sec{font:700 16px var(--display);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 8px}
+.two{display:grid;gap:4px}
+@media (min-width:860px){.two{grid-template-columns:1fr 1fr;gap:16px}.two .sec:first-child{margin-top:0}}
+.note{font-size:11px;color:var(--muted);margin:10px 2px 0;max-width:70ch}
+.vals{margin:0 0 12px}
+.vals summary{cursor:pointer;padding:10px 12px;font-weight:600;font-size:13px;list-style:none;display:flex;justify-content:space-between}
+.vals summary::after{content:'+';color:var(--muted);font-weight:500}
+.vals[open] summary::after{content:'−'}
+.vals summary::-webkit-details-marker{display:none}
+.values{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.values span{font-size:11.5px;padding:4px 8px;border-radius:6px;background:var(--soft);border:1px solid var(--line)}
+.values b{font-weight:600}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+@media (min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{padding:12px}
+.kpi b{display:block;font:700 26px/1 var(--display)}
+.kpi span{font-size:11.5px;color:var(--muted)}
+.prose{padding:14px 14px 4px;font-size:13.5px;max-width:68ch}
+.prose p{margin:0 0 10px}
+
+.bet{padding:12px;display:grid;gap:8px}
+.bet-top{display:flex;align-items:center;gap:8px}
+.tier{font:600 10.5px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:99px}
+.tier.Bet{background:var(--accent);color:var(--accent-ink)} .tier.Lean{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.bet-name{font:700 21px/1 var(--display);text-transform:uppercase}
+.bet-price{margin-left:auto;font:700 21px/1 var(--display)}
+.bet-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.bet-stats div{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.bet-stats b{display:block;font:700 16px/1.1 var(--display)}
+.bet-stats span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.bet-why{font-size:12.5px;color:var(--muted);margin:0}
+.bank{display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:10px}
+.bank label{font-size:12.5px;color:var(--muted)}
+.bank input{margin-left:auto;width:110px;font:600 15px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);text-align:right}
+.pass{grid-template-columns:1fr}
+.rules{font-size:12px;color:var(--muted);padding:10px 12px;line-height:1.5}
+@media (prefers-reduced-motion:no-preference){.bar i,.meter i{transition:width .35s}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="mast"><div class="logo">Gain<span>line</span></div><div class="upd" id="upd"></div></div>
+    <nav id="nav" aria-label="Sections">
+      <a href="#projections">Matches</a><a href="#try-scorers">Tries</a><a href="#ratings">Ratings</a><a href="#player-grades">Grades</a><a href="#bets">Bets</a><a href="#method">Method</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+<script>
+const D = {"updated": "18 Nov", "round": "Nations Championship \u00b7 Round 6", "matches": [{"home": "England", "away": "New Zealand", "venue": "Twickenham", "ko": "14:10 GMT", "p_home": 0.6157513981634921, "p_away": 0.3570499046060387, "p_draw": 0.027198697230469193, "proj_home": 32, "proj_away": 28, "spread": -4.028596921672239, "total": 59.45889651072802, "fair_home": "-160", "fair_away": "+180", "mkt_home": "+100", "mkt_away": "-130", "mkt_spread": 0.5, "mdh": 2.0, "mda": 1.7692, "p_cover_home": 0.6278346809261397}, {"home": "Scotland", "away": "Japan", "venue": "Murrayfield", "ko": "14:10 GMT", "p_home": 0.9682630761637212, "p_away": 0.026935524578323156, "p_draw": 0.004801399257955641, "proj_home": 42, "proj_away": 16, "spread": -25.712010523604476, "total": 58.22280318463694, "fair_home": "-3051", "fair_away": "+3613", "mkt_home": "-20000", "mkt_away": "+1700", "mkt_spread": -27.5, "mdh": 1.005, "mda": 18.0, "p_cover_home": 0.44877343732837927}, {"home": "Ireland", "away": "South Africa", "venue": "Aviva Stadium", "ko": "16:40 GMT", "p_home": 0.30475192236742066, "p_away": 0.6695849887127427, "p_draw": 0.025663088919836596, "proj_home": 23, "proj_away": 30, "spread": 7.151441959160447, "total": 52.34602707596882, "fair_home": "+228", "fair_away": "-203", "mkt_home": "+320", "mkt_away": "-480", "mkt_spread": 9.5, "mdh": 4.2, "mda": 1.2083, "p_cover_home": 0.567152739767917}, {"home": "Italy", "away": "Fiji", "venue": "Udine", "ko": "16:40 GMT", "p_home": 0.5405793185306652, "p_away": 0.43096902581999164, "p_draw": 0.028451655649343155, "proj_home": 28, "proj_away": 26, "spread": -1.3562415456552857, "total": 54.17706549677358, "fair_home": "-118", "fair_away": "+132", "mkt_home": "-250", "mkt_away": "+185", "mkt_spread": -5.5, "mdh": 1.4, "mda": 2.85, "p_cover_home": 0.3826951343779993}, {"home": "France", "away": "Argentina", "venue": "Stade de France", "ko": "20:10 GMT", "p_home": 0.9054476130802451, "p_away": 0.08298857469157184, "p_draw": 0.011563812228183035, "proj_home": 38, "proj_away": 20, "spread": -18.17704287182284, "total": 58.79427410645769, "fair_home": "-958", "fair_away": "+1105", "mkt_home": "-3497", "mkt_away": "+980", "mkt_spread": -19.5, "mdh": 1.0286, "mda": 10.8, "p_cover_home": 0.462049442684375}, {"home": "Wales", "away": "Australia", "venue": "Principality Stadium", "ko": "20:10 GMT", "p_home": 0.23187605777481624, "p_away": 0.7455874216459222, "p_draw": 0.022536520579261587, "proj_home": 23, "proj_away": 33, "spread": 10.232782334860568, "total": 55.3211809868033, "fair_home": "+331", "fair_away": "-293", "mkt_home": "+175", "mkt_away": "-235", "mkt_spread": 5.5, "mdh": 2.75, "mda": 1.4255, "p_cover_home": 0.3666164804875698}], "tries": [{"team": "England", "name": "Cadan Murley", "pos": "wing", "p": 0.5794701437281438, "fair": "-138", "bet_at": "-123"}, {"team": "England", "name": "Tom Roebuck", "pos": "wing", "p": 0.45740972701952154, "fair": "+119", "bet_at": "+130"}, {"team": "England", "name": "Henry Arundell", "pos": "wing", "p": 0.4338307821772007, "fair": "+131", "bet_at": "+142"}, {"team": "New Zealand", "name": "Sevu Reece", "pos": "wing", "p": 0.37945416467658755, "fair": "+164", "bet_at": "+177"}, {"team": "New Zealand", "name": "Will Jordan", "pos": "fullback", "p": 0.34445668750747616, "fair": "+190", "bet_at": "+205"}, {"team": "New Zealand", "name": "Cam Roigard", "pos": "scrum half", "p": 0.28038691559649315, "fair": "+257", "bet_at": "+274"}, {"team": "Scotland", "name": "Darcy Graham", "pos": "wing", "p": 0.6792405283234255, "fair": "-212", "bet_at": "-183"}, {"team": "Scotland", "name": "Kyle Steyn", "pos": "wing", "p": 0.5938050720029324, "fair": "-146", "bet_at": "-130"}, {"team": "Scotland", "name": "Huw Jones", "pos": "centre", "p": 0.49568317039536597, "fair": "+102", "bet_at": "+112"}, {"team": "Japan", "name": "Kippei Ishida", "pos": "wing", "p": 0.20479657089575043, "fair": "+388", "bet_at": "+413"}, {"team": "Japan", "name": "Tomoki Osada", "pos": "wing", "p": 0.1963769255483065, "fair": "+409", "bet_at": "+435"}, {"team": "Japan", "name": "Haruto Kida", "pos": "wing", "p": 0.1767808676206917, "fair": "+466", "bet_at": "+494"}, {"team": "Ireland", "name": "James Lowe", "pos": "wing", "p": 0.2929688469215088, "fair": "+241", "bet_at": "+258"}, {"team": "Ireland", "name": "Robert Baloucoune", "pos": "wing", "p": 0.27766401064932333, "fair": "+260", "bet_at": "+278"}, {"team": "Ireland", "name": "Tommy O'Brien", "pos": "wing", "p": 0.2674059035064337, "fair": "+274", "bet_at": "+293"}, {"team": "South Africa", "name": "Kurt-Lee Arendse", "pos": "wing", "p": 0.40238428514490526, "fair": "+149", "bet_at": "+161"}, {"team": "South Africa", "name": "Edwill van der Merwe", "pos": "wing", "p": 0.3624037832143208, "fair": "+176", "bet_at": "+190"}, {"team": "South Africa", "name": "Cheslin Kolbe", "pos": "wing", "p": 0.3019564967076602, "fair": "+231", "bet_at": "+248"}, {"team": "Italy", "name": "Louis Lynagh", "pos": "wing", "p": 0.31905739312741477, "fair": "+213", "bet_at": "+229"}, {"team": "Italy", "name": "Ange Capuozzo", "pos": "fullback", "p": 0.2723345440188883, "fair": "+267", "bet_at": "+286"}, {"team": "Italy", "name": "Monty Ioane", "pos": "wing", "p": 0.25117916298910387, "fair": "+298", "bet_at": "+318"}, {"team": "Fiji", "name": "Kalaveti Ravouvou", "pos": "wing", "p": 0.3598412627341601, "fair": "+178", "bet_at": "+192"}, {"team": "Fiji", "name": "Taniela Rakuro", "pos": "wing", "p": 0.3537899294041072, "fair": "+183", "bet_at": "+197"}, {"team": "Fiji", "name": "Tevita Ikanivere", "pos": "hooker", "p": 0.19603461730094082, "fair": "+410", "bet_at": "+436"}, {"team": "France", "name": "Louis Bielle-Biarrey", "pos": "wing", "p": 0.6444560637168909, "fair": "-181", "bet_at": "-159"}, {"team": "France", "name": "Emilien Gailleton", "pos": "centre", "p": 0.4720616026475804, "fair": "+112", "bet_at": "+122"}, {"team": "France", "name": "Nicolas Depoortere", "pos": "centre", "p": 0.3879988324876287, "fair": "+158", "bet_at": "+171"}, {"team": "Argentina", "name": "Ignacio Mendy", "pos": "wing", "p": 0.2830539878426033, "fair": "+253", "bet_at": "+271"}, {"team": "Argentina", "name": "Bautista Delguy", "pos": "wing", "p": 0.2260621453201407, "fair": "+342", "bet_at": "+364"}, {"team": "Argentina", "name": "Mateo Carreras", "pos": "fullback", "p": 0.1971039754380689, "fair": "+407", "bet_at": "+433"}, {"team": "Wales", "name": "Josh Adams", "pos": "wing", "p": 0.26131924657786526, "fair": "+283", "bet_at": "+302"}, {"team": "Wales", "name": "Dewi Lake", "pos": "hooker", "p": 0.19220788478977946, "fair": "+420", "bet_at": "+446"}, {"team": "Wales", "name": "Louis Rees-Zammit", "pos": "fullback", "p": 0.18814793055188717, "fair": "+431", "bet_at": "+458"}, {"team": "Australia", "name": "Harry Potter", "pos": "wing", "p": 0.39974103054346866, "fair": "+150", "bet_at": "+163"}, {"team": "Australia", "name": "Filipo Daugunu", "pos": "wing", "p": 0.39217880908512315, "fair": "+155", "bet_at": "+168"}, {"team": "Australia", "name": "Max Jorgensen", "pos": "fullback", "p": 0.3231655825061808, "fair": "+209", "bet_at": "+225"}], "intl": [{"team": "South Africa", "rating": 27.97}, {"team": "France", "rating": 22.21}, {"team": "England", "rating": 21.53}, {"team": "New Zealand", "rating": 21.5}, {"team": "Ireland", "rating": 16.82}, {"team": "Scotland", "rating": 13.22}, {"team": "Australia", "rating": 11.73}, {"team": "Argentina", "rating": 8.03}, {"team": "Wales", "rating": -2.5}, {"team": "Fiji", "rating": -2.57}, {"team": "Italy", "rating": -5.21}, {"team": "Japan", "rating": -8.49}], "club": [{"team": "Bayonne", "rating": -0.56, "league": "Top 14"}, {"team": "Lyon", "rating": 1.7, "league": "Top 14"}, {"team": "Montpellier", "rating": 8.99, "league": "Top 14"}, {"team": "Castres", "rating": -3.0, "league": "Top 14"}, {"team": "Bordeaux-Begles", "rating": 6.73, "league": "Top 14"}, {"team": "Stade Francais", "rating": 4.3, "league": "Top 14"}, {"team": "La Rochelle", "rating": 2.65, "league": "Top 14"}, {"team": "Pau", "rating": 5.55, "league": "Top 14"}, {"team": "Perpignan", "rating": -5.19, "league": "Top 14"}, {"team": "Clermont Auvergne", "rating": -0.02, "league": "Top 14"}, {"team": "Racing 92", "rating": 1.25, "league": "Top 14"}, {"team": "Vannes", "rating": -4.63, "league": "Top 14"}, {"team": "Toulon", "rating": 2.19, "league": "Top 14"}, {"team": "Toulouse", "rating": 8.94, "league": "Top 14"}, {"team": "Harlequins", "rating": -0.53, "league": "Prem"}, {"team": "Northampton", "rating": 5.97, "league": "Prem"}, {"team": "Sale Sharks", "rating": -1.26, "league": "Prem"}, {"team": "Exeter", "rating": 1.29, "league": "Prem"}, {"team": "Leicester Tigers", "rating": 5.77, "league": "Prem"}, {"team": "Bath", "rating": 5.66, "league": "Prem"}, {"team": "Gloucester", "rating": 2.61, "league": "Prem"}, {"team": "Newcastle", "rating": -11.81, "league": "Prem"}, {"team": "Bristol Bears", "rating": 2.38, "league": "Prem"}, {"team": "Saracens", "rating": 3.86, "league": "Prem"}, {"team": "Benetton", "rating": -0.32, "league": "URC"}, {"team": "Ulster", "rating": -0.53, "league": "URC"}, {"team": "Connacht", "rating": -0.19, "league": "URC"}, {"team": "Zebre", "rating": -11.97, "league": "URC"}, {"team": "Lions", "rating": -1.46, "league": "URC"}, {"team": "Scarlets", "rating": -5.04, "league": "URC"}, {"team": "Sharks", "rating": 4.65, "league": "URC"}, {"team": "Munster", "rating": 0.7, "league": "URC"}, {"team": "Cardiff", "rating": -1.59, "league": "URC"}, {"team": "Edinburgh", "rating": -2.33, "league": "URC"}, {"team": "Glasgow Warriors", "rating": 3.72, "league": "URC"}, {"team": "Dragons", "rating": -5.13, "league": "URC"}, {"team": "Leinster", "rating": 10.86, "league": "URC"}, {"team": "Stormers", "rating": 6.32, "league": "URC"}, {"team": "Bulls", "rating": 7.66, "league": "URC"}, {"team": "Ospreys", "rating": -3.83, "league": "URC"}], "grades": [{"team": "South Africa", "name": "Malcolm Marx", "pos": "sub fwd", "grade": 86, "pa": 7.0, "key": "1 LB, 18 m, 17 tkl, 3 TO"}, {"team": "New Zealand", "name": "Cam Roigard", "pos": "scrum half", "grade": 82, "pa": 9.8, "key": "1 T, 1 LB, 56 m, 7 tkl"}, {"team": "New Zealand", "name": "Ardie Savea", "pos": "back row", "grade": 79, "pa": 10.9, "key": "1 T, 1 LB, 49 m, 17 tkl"}, {"team": "South Africa", "name": "Jesse Kriel", "pos": "centre", "grade": 77, "pa": 10.4, "key": "1 T, 1 LB, 29 m, 18 tkl, 2 TO, 1 pen"}, {"team": "South Africa", "name": "Cobus Reinach", "pos": "scrum half", "grade": 71, "pa": 6.2, "key": "3 TA, 9 m, 5 tkl"}, {"team": "South Africa", "name": "Damian de Allende", "pos": "centre", "grade": 69, "pa": 7.2, "key": "1 T, 24 m, 19 tkl"}, {"team": "New Zealand", "name": "Quinn Tupaea", "pos": "centre", "grade": 67, "pa": 6.6, "key": "2 TA, 14 m, 6 tkl"}, {"team": "New Zealand", "name": "Will Jordan", "pos": "wing", "grade": 67, "pa": 9.8, "key": "1 TA, 2 LB, 117 m, 8 tkl"}, {"team": "New Zealand", "name": "Simon Parker", "pos": "back row", "grade": 67, "pa": 6.2, "key": "1 LB, 30 m, 11 tkl"}, {"team": "South Africa", "name": "Eben Etzebeth", "pos": "lock", "grade": 67, "pa": 4.8, "key": "1 LB, 19 m, 20 tkl"}, {"team": "New Zealand", "name": "Leroy Carter", "pos": "wing", "grade": 66, "pa": 8.9, "key": "1 T, 1 LB, 49 m, 6 tkl, 1 TO, 1 pen"}, {"team": "South Africa", "name": "Siya Kolisi", "pos": "back row", "grade": 66, "pa": 5.7, "key": "1 T, 4 m, 6 tkl"}, {"team": "New Zealand", "name": "Kyle Preston", "pos": "sub back", "grade": 63, "pa": 2.5, "key": "1 TA"}, {"team": "New Zealand", "name": "George Bower", "pos": "prop", "grade": 63, "pa": 1.3, "key": "12 tkl"}, {"team": "New Zealand", "name": "Damian McKenzie", "pos": "fullback", "grade": 62, "pa": 6.7, "key": "1 T, 1 LB, 41 m, 3 tkl"}, {"team": "South Africa", "name": "Ruan Nortje", "pos": "lock", "grade": 62, "pa": 3.2, "key": "10 m, 13 tkl"}, {"team": "New Zealand", "name": "Asafo Aumua", "pos": "sub fwd", "grade": 61, "pa": 1.4, "key": "16 m, 4 tkl"}, {"team": "New Zealand", "name": "Fabian Holland", "pos": "lock", "grade": 61, "pa": 2.7, "key": "9 m, 14 tkl, 1 TO"}, {"team": "New Zealand", "name": "Patrick Tuipulotu", "pos": "sub fwd", "grade": 60, "pa": 1.3, "key": "2 m"}, {"team": "South Africa", "name": "Andre Esterhuizen", "pos": "sub fwd", "grade": 60, "pa": 1.2, "key": "24 m, 8 tkl, 1 TO, 1 pen"}, {"team": "South Africa", "name": "Pieter-Steph du Toit", "pos": "back row", "grade": 59, "pa": 2.8, "key": "13 m, 18 tkl"}, {"team": "New Zealand", "name": "Xavier Numia", "pos": "sub fwd", "grade": 59, "pa": 0.9, "key": "5 m, 2 tkl"}, {"team": "New Zealand", "name": "Peter Lakai", "pos": "sub fwd", "grade": 58, "pa": 0.7, "key": "6 m, 4 tkl"}, {"team": "South Africa", "name": "Thomas du Toit", "pos": "prop", "grade": 58, "pa": 0.2, "key": "21 m, 12 tkl"}, {"team": "South Africa", "name": "Wilco Louw", "pos": "sub fwd", "grade": 58, "pa": 0.8, "key": "2 m, 9 tkl"}, {"team": "South Africa", "name": "Manie Libbok", "pos": "sub back", "grade": 58, "pa": 1.3, "key": "16 m, 12 tkl"}, {"team": "South Africa", "name": "Gerhard Steenekamp", "pos": "prop", "grade": 58, "pa": 0.2, "key": "3 tkl"}, {"team": "South Africa", "name": "Ethan Hooker", "pos": "wing", "grade": 57, "pa": 4.0, "key": "1 LB, 36 m, 7 tkl"}, {"team": "South Africa", "name": "Deon Fourie", "pos": "hooker", "grade": 56, "pa": 1.3, "key": "21 m, 5 tkl"}, {"team": "New Zealand", "name": "Tyrel Lomax", "pos": "prop", "grade": 56, "pa": -0.2, "key": "6 tkl, 2 pen"}, {"team": "New Zealand", "name": "Fletcher Newell", "pos": "sub fwd", "grade": 56, "pa": 0.3, "key": "2 m, 4 tkl"}, {"team": "New Zealand", "name": "Anton Lienert-Brown", "pos": "sub back", "grade": 55, "pa": 0.2, "key": "2 m, 1 tkl"}, {"team": "South Africa", "name": "Ox Nche", "pos": "sub fwd", "grade": 55, "pa": 0.0, "key": "3 m, 9 tkl, 1 pen"}, {"team": "South Africa", "name": "Jasper Wiese", "pos": "back row", "grade": 54, "pa": 0.8, "key": "21 m, 13 tkl"}, {"team": "South Africa", "name": "Morne van den Berg", "pos": "sub back", "grade": 52, "pa": -0.7, "key": "8 tkl"}, {"team": "New Zealand", "name": "Codie Taylor", "pos": "hooker", "grade": 51, "pa": -0.5, "key": "13 m, 9 tkl, 1 pen"}, {"team": "New Zealand", "name": "Luke Jacobson", "pos": "back row", "grade": 51, "pa": -0.5, "key": "8 m, 11 tkl, 1 pen"}, {"team": "South Africa", "name": "Sacha Feinberg-Mngomezulu", "pos": "fly half", "grade": 51, "pa": 0.6, "key": "4 m, 7 tkl"}, {"team": "South Africa", "name": "Cheslin Kolbe", "pos": "wing", "grade": 51, "pa": 0.8, "key": "1 LB, 58 m, 9 tkl"}, {"team": "New Zealand", "name": "Tupou Vaa'i", "pos": "lock", "grade": 51, "pa": -0.3, "key": "15 m, 8 tkl, 2 pen"}, {"team": "South Africa", "name": "Cameron Hanekom", "pos": "sub back", "grade": 50, "pa": -1.2, "key": "5 m, 1 tkl, 1 pen"}, {"team": "New Zealand", "name": "Ruben Love", "pos": "fly half", "grade": 49, "pa": -0.4, "key": "21 m, 4 tkl, 1 pen"}, {"team": "South Africa", "name": "Damian Willemse", "pos": "fullback", "grade": 49, "pa": -0.5, "key": "8 m, 2 tkl"}, {"team": "New Zealand", "name": "Jordie Barrett", "pos": "centre", "grade": 49, "pa": -1.1, "key": "26 m, 11 tkl"}, {"team": "South Africa", "name": "Lood de Jager", "pos": "sub fwd", "grade": 40, "pa": -3.3, "key": "6 m, 5 tkl, 1 pen"}], "grades_match": "South Africa 33\u201326 New Zealand \u00b7 Cape Town \u00b7 29 Aug 2026", "backtest": {"intl_brier": 0.1584, "intl_acc": 0.767, "club_brier": 0.1725, "try_brier": 0.1142, "sr_brier": 0.1695, "sr_acc": 0.759}, "grade_values": {"line_breaks": 1.617, "metres_carried": 0.05, "tackles_made": 0.06, "turnovers_won": 1.054, "lineouts_won": 0.58, "dominant_tackles": 0.162, "tackles_missed": -0.044, "turnovers_lost": -1.037, "penalties_conceded": -0.516, "points": 1.0, "try_assists": 2.5, "yellow_cards": -3.5, "red_cards": -8.0}, "betsTab": {"updated": "18 Nov", "round": "Nations Championship \u00b7 Round 6 \u00b7 Sat 21 Nov", "lines": "Sportingbet board, 17 Nov", "bets": [{"match": "Italy v Fiji", "team": "Fiji", "opp": "Italy", "kind": "ML", "bet": "Fiji ML", "am": "+185", "dec": 2.85, "model": 0.44358989269652216, "mkt": 0.32941176439662284, "blend": 0.38650082854657253, "ev": 0.09863873983339505, "qk": 0.013329559436945292, "gap": 4.143758454344715, "nd": 0.9715483443506568, "min_am": "+172", "tier": "Bet", "why": "Model Italy \u22121.5 vs market Italy \u22125.5: a 4.1-point gap."}, {"match": "Wales v Australia", "team": "Australia", "opp": "Wales", "kind": "HCP", "bet": "Australia \u22125.5", "am": "-108", "dec": 1.9259, "model": 0.6333835195124302, "mkt": 0.4956792709751754, "blend": 0.5645313952438028, "ev": 0.08723101410003986, "qk": 0.02355303329194291, "gap": 4.732782334860568, "nd": 1.0, "min_am": "-116", "tier": "Bet", "why": "Model Wales +10 vs market Wales +5.5: a 4.7-point gap."}], "passes": [{"bet": "England ML (+100)", "why": "Most of the edge comes from NZ losing to Wales with 10 changes. Remove that game and the model has England by 2, about half the gap to the line, and the November touring trend favours NZ."}, {"bet": "Scotland v Japan", "why": "No side clears +5%. Model Scotland \u221225.5 vs market Scotland \u221227.5."}, {"bet": "Ireland ML (+320)", "why": "+12% on paper, but the model margin is only +2.3 pts against the handicap. The value comes from the win-probability curve on underdogs, not the ratings."}, {"bet": "France v Argentina", "why": "No side clears +5%. Model France \u221218 vs market France \u221219.5."}], "tries": [{"name": "Darcy Graham", "team": "Scotland", "p": 0.6792405283234255, "bet_at": "-183"}, {"name": "Louis Bielle-Biarrey", "team": "France", "p": 0.6444560637168909, "bet_at": "-159"}, {"name": "Kyle Steyn", "team": "Scotland", "p": 0.5938050720029324, "bet_at": "-130"}, {"name": "Cadan Murley", "team": "England", "p": 0.5794701437281438, "bet_at": "-123"}, {"name": "Huw Jones", "team": "Scotland", "p": 0.49568317039536597, "bet_at": "+112"}, {"name": "Emilien Gailleton", "team": "France", "p": 0.4720616026475804, "bet_at": "+122"}, {"name": "Tom Roebuck", "team": "England", "p": 0.45740972701952154, "bet_at": "+130"}, {"name": "Henry Arundell", "team": "England", "p": 0.4338307821772007, "bet_at": "+142"}, {"name": "Kurt-Lee Arendse", "team": "South Africa", "p": 0.40238428514490526, "bet_at": "+161"}, {"name": "Harry Potter", "team": "Australia", "p": 0.39974103054346866, "bet_at": "+163"}, {"name": "Filipo Daugunu", "team": "Australia", "p": 0.39217880908512315, "bet_at": "+168"}, {"name": "Nicolas Depoortere", "team": "France", "p": 0.3879988324876287, "bet_at": "+171"}, {"name": "Sevu Reece", "team": "New Zealand", "p": 0.37945416467658755, "bet_at": "+177"}, {"name": "Edwill van der Merwe", "team": "South Africa", "p": 0.3624037832143208, "bet_at": "+190"}, {"name": "Kalaveti Ravouvou", "team": "Fiji", "p": 0.3598412627341601, "bet_at": "+192"}, {"name": "Taniela Rakuro", "team": "Fiji", "p": 0.3537899294041072, "bet_at": "+197"}, {"name": "Will Jordan", "team": "New Zealand", "p": 0.34445668750747616, "bet_at": "+205"}, {"name": "Max Jorgensen", "team": "Australia", "p": 0.3231655825061808, "bet_at": "+225"}, {"name": "Louis Lynagh", "team": "Italy", "p": 0.31905739312741477, "bet_at": "+229"}, {"name": "Cheslin Kolbe", "team": "South Africa", "p": 0.3019564967076602, "bet_at": "+248"}, {"name": "James Lowe", "team": "Ireland", "p": 0.2929688469215088, "bet_at": "+258"}, {"name": "Ignacio Mendy", "team": "Argentina", "p": 0.2830539878426033, "bet_at": "+271"}, {"name": "Cam Roigard", "team": "New Zealand", "p": 0.28038691559649315, "bet_at": "+274"}, {"name": "Robert Baloucoune", "team": "Ireland", "p": 0.27766401064932333, "bet_at": "+278"}, {"name": "Ange Capuozzo", "team": "Italy", "p": 0.2723345440188883, "bet_at": "+286"}, {"name": "Tommy O'Brien", "team": "Ireland", "p": 0.2674059035064337, "bet_at": "+293"}, {"name": "Josh Adams", "team": "Wales", "p": 0.26131924657786526, "bet_at": "+302"}, {"name": "Monty Ioane", "team": "Italy", "p": 0.25117916298910387, "bet_at": "+318"}, {"name": "Bautista Delguy", "team": "Argentina", "p": 0.2260621453201407, "bet_at": "+364"}, {"name": "Kippei Ishida", "team": "Japan", "p": 0.20479657089575043, "bet_at": "+413"}, {"name": "Mateo Carreras", "team": "Argentina", "p": 0.1971039754380689, "bet_at": "+433"}, {"name": "Tomoki Osada", "team": "Japan", "p": 0.1963769255483065, "bet_at": "+435"}, {"name": "Tevita Ikanivere", "team": "Fiji", "p": 0.19603461730094082, "bet_at": "+436"}, {"name": "Dewi Lake", "team": "Wales", "p": 0.19220788478977946, "bet_at": "+446"}, {"name": "Louis Rees-Zammit", "team": "Wales", "p": 0.18814793055188717, "bet_at": "+458"}, {"name": "Haruto Kida", "team": "Japan", "p": 0.1767808676206917, "bet_at": "+494"}], "rules": "Blend 50/50 with market \u00b7 +5% EV floor \u00b7 moneylines need a 3-pt rating edge \u00b7 20+ pt lines capped at Lean"}, "sr": [{"team": "Hurricanes", "rating": 9.61}, {"team": "Chiefs", "rating": 7.22}, {"team": "Crusaders", "rating": 4.67}, {"team": "Blues", "rating": 2.35}, {"team": "Brumbies", "rating": 0.76}, {"team": "Reds", "rating": 0.16}, {"team": "Force", "rating": -2.93}, {"team": "Highlanders", "rating": -3.66}, {"team": "Waratahs", "rating": -4.07}, {"team": "Fijian Drua", "rating": -6.48}, {"team": "Moana Pasifika", "rating": -7.62}], "probit": {"a": 0.04023164596858263, "b": 0.07201432920276737, "sigma": 13.886125317981465}};
+// ---------- team identity: colours (kit-based) and flags ----------
+const TC = {
+ 'England':['#c8102e','#1d2a5c'], 'New Zealand':['#111111','#8a8d91','#e9ecef'], 'Scotland':['#1b2a5c','#6b8fd6'],
+ 'Japan':['#c8102e','#1b2a5c'], 'Ireland':['#169b62','#ff883e'], 'South Africa':['#e0a91b','#007a4d'],
+ 'Italy':['#1f6fd1','#0b2d5e'], 'Fiji':['#3a8fc4','#111111'], 'France':['#1b3a8c','#c8102e'], 'Argentina':['#74acdf','#1b3a8c'],
+ 'Wales':['#c8102e','#00a34a'], 'Australia':['#f2c300','#00843d'],
+ 'Toulouse':['#c8102e','#111'],'Bordeaux-Begles':['#7a1f3d','#fff'],'La Rochelle':['#f2c300','#111'],'Racing 92':['#6cb4e4','#fff'],
+ 'Stade Francais':['#e5007e','#1b2a5c'],'Toulon':['#c8102e','#111'],'Clermont Auvergne':['#f2c300','#1b2a5c'],'Montpellier':['#1b3a8c','#6cb4e4'],
+ 'Pau':['#00843d','#fff'],'Castres':['#1b3a8c','#fff'],'Bayonne':['#6cb4e4','#fff'],'Lyon':['#c8102e','#111'],'Perpignan':['#c8102e','#f2c300'],'Vannes':['#111','#2c6fbf'],
+ 'Bath':['#1b2a5c','#6cb4e4'],'Bristol Bears':['#1b2a5c','#c8102e'],'Exeter':['#111','#fff'],'Gloucester':['#a0162c','#fff'],'Harlequins':['#c2186b','#6cb4e4'],
+ 'Leicester Tigers':['#00754a','#c8102e'],'Newcastle':['#c8102e','#1b2a5c'],'Northampton':['#00513a','#c9a227'],'Sale Sharks':['#1b3a8c','#fff'],'Saracens':['#111','#c8102e'],
+ 'Leinster':['#1d4f91','#fff'],'Munster':['#c8102e','#fff'],'Ulster':['#ececec','#c8102e'],'Connacht':['#00843d','#111'],'Bulls':['#1d4f91','#fff'],
+ 'Stormers':['#1d4f91','#fff'],'Sharks':['#111','#fff'],'Lions':['#c8102e','#fff'],'Glasgow Warriors':['#1b2a5c','#f2a900'],'Edinburgh':['#7a1f3d','#111'],
+ 'Blues':['#1d4f91','#fff'],'Chiefs':['#c8102e','#f2c300'],'Crusaders':['#111','#c8102e'],'Highlanders':['#7a1f3d','#f2c300'],'Hurricanes':['#f2c300','#111'],'Moana Pasifika':['#00808a','#fff'],'Fijian Drua':['#0a9bd6','#fff'],'Brumbies':['#0b2d5e','#f2c300'],'Waratahs':['#6cb4e4','#1b2a5c'],'Reds':['#a6192e','#fff'],'Force':['#2b4ea2','#fff'],
+ 'Benetton':['#00843d','#fff'],'Zebre':['#111','#f2c300'],'Cardiff':['#1d4f91','#111'],'Ospreys':['#111','#fff'],'Scarlets':['#c8102e','#fff'],'Dragons':['#c8102e','#111']
+};
+const isDark = () => document.documentElement.dataset.theme==='dark' || (document.documentElement.dataset.theme!=='light' && matchMedia('(prefers-color-scheme: dark)').matches);
+function tcol(t){const c=TC[t]||['#5d6b64','#999'];return (isDark()&&c[2])?c[2]:c[0];}
+function rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');return [0,2,4].map(i=>parseInt(h.substr(i,2),16));}
+function dist(a,b){const x=rgb(a),y=rgb(b);return Math.hypot(x[0]-y[0],x[1]-y[1],x[2]-y[2]);}
+function pairCols(h,a){const ch=tcol(h);let ca=tcol(a);if(dist(ch,ca)<120){ca=(TC[a]||[])[1]||'#888';}return [ch,ca];}
+function ink(bg){const [r,g,b]=rgb(bg);return (0.299*r+0.587*g+0.114*b)>150?'#111':'#fff';}
+const UJ = '<g transform="scale(.25 .3334)"><rect width="60" height="30" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" stroke="#C8102E" stroke-width="2"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></g>';
+function star(cx,cy,r,fill,stroke){let p='';for(let i=0;i<10;i++){const a=Math.PI/5*i-Math.PI/2,rr=i%2?r*.42:r;p+=(i?'L':'M')+(cx+rr*Math.cos(a)).toFixed(2)+','+(cy+rr*Math.sin(a)).toFixed(2);}return `<path d="${p}Z" fill="${fill}"${stroke?` stroke="${stroke}" stroke-width=".5"`:''}/>`;}
+const FLAG = {
+ 'England':'<rect width="30" height="20" fill="#fff"/><path d="M15,0v20M0,10h30" stroke="#CE1124" stroke-width="4"/>',
+ 'Scotland':'<rect width="30" height="20" fill="#005EB8"/><path d="M0,0 30,20M30,0 0,20" stroke="#fff" stroke-width="3.2"/>',
+ 'Wales':'<rect width="30" height="10" fill="#fff"/><rect y="10" width="30" height="10" fill="#00B140"/><path d="M7,14 C8,9 12,7 15,8.5 L17.5,5 L17.8,8.6 C20.5,8 23,9.5 23,12 L21,11.6 L20.5,14 L18.6,12.8 L17,15.5 L15.5,13.4 L13,15.8 L12,13.6 L9.5,15.6 Z" fill="#D30731"/>',
+ 'Ireland':'<rect width="10" height="20" fill="#169B62"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#FF883E"/>',
+ 'France':'<rect width="10" height="20" fill="#002395"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ED2939"/>',
+ 'Italy':'<rect width="10" height="20" fill="#009246"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#CE2B37"/>',
+ 'Japan':'<rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#BC002D"/>',
+ 'Argentina':'<rect width="30" height="20" fill="#74ACDF"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><circle cx="15" cy="10" r="2.2" fill="#F6B40E" stroke="#85340A" stroke-width=".3"/>',
+ 'South Africa':'<rect width="30" height="10" fill="#E03C31"/><rect y="10" width="30" height="10" fill="#001489"/><path d="M0,0 12,10 0,20M12,10H30" stroke="#fff" stroke-width="6.6" fill="none"/><path d="M0,0 12,10 0,20M12,10H30" stroke="#007749" stroke-width="4" fill="none"/><path d="M0,2.6 9.2,10 0,17.4Z" fill="#FFB81C"/><path d="M0,4.4 7,10 0,15.6Z" fill="#000"/>',
+ 'New Zealand':'<rect width="30" height="20" fill="#012169"/>'+'UJ'+star(22,5.2,1.4,'#C8102E','#fff')+star(25,9.4,1.4,'#C8102E','#fff')+star(19.6,10.4,1.2,'#C8102E','#fff')+star(22,15.4,1.6,'#C8102E','#fff'),
+ 'Australia':'<rect width="30" height="20" fill="#012169"/>'+'UJ'+star(7.5,15,2.4,'#fff')+star(22.5,16.2,1.4,'#fff')+star(18.6,9,1.3,'#fff')+star(22.5,3.6,1.3,'#fff')+star(26.2,7.8,1.3,'#fff')+star(24.4,11,.7,'#fff'),
+ 'Fiji':'<rect width="30" height="20" fill="#68BFE5"/>'+'UJ'+'<path d="M18.5,5h7v6.5c0,2.6-3.5,4-3.5,4s-3.5-1.4-3.5-4Z" fill="#fff" stroke="#C8102E" stroke-width=".4"/><rect x="18.5" y="5" width="7" height="2.2" fill="#C8102E"/>'
+};
+function flag(t,h=16){if(!FLAG[t])return badge(t,h+4);return `<svg class="flag" viewBox="0 0 30 20" width="${h*1.5}" height="${h}" aria-hidden="true">${FLAG[t].replace('UJ',UJ)}</svg>`;}
+const AB={'Blues':'BLU','Chiefs':'CHI','Crusaders':'CRU','Highlanders':'HIG','Hurricanes':'HUR','Moana Pasifika':'MOA','Fijian Drua':'DRU','Brumbies':'BRU','Waratahs':'WAR','Reds':'RED','Force':'FOR','La Rochelle':'LR','Racing 92':'R92','Bordeaux-Begles':'UBB','Stade Francais':'SF','Clermont Auvergne':'ASM','Leicester Tigers':'LEI','Bristol Bears':'BRI','Glasgow Warriors':'GLA','Sale Sharks':'SAL','Harlequins':'HQ','Northampton':'NOR','Saracens':'SAR','Gloucester':'GLO','Newcastle':'NEW','Exeter':'EXE','Bath':'BAT','Toulouse':'ST','Toulon':'RCT','Montpellier':'MHR','Castres':'CO','Bayonne':'AB','Lyon':'LOU','Perpignan':'USAP','Vannes':'RCV','Pau':'SP','Leinster':'LEI','Munster':'MUN','Ulster':'ULS','Connacht':'CON','Bulls':'BUL','Stormers':'STO','Sharks':'SHA','Lions':'LIO','Edinburgh':'EDI','Benetton':'BEN','Zebre':'ZEB','Cardiff':'CAR','Ospreys':'OSP','Scarlets':'SCA','Dragons':'DRA'};
+function badge(t,s=22){const c=TC[t]||['#5d6b64','#fff'];const ab=AB[t]||t.replace(/-/g,' ').split(' ').filter(w=>!['de','des','la','le','rugby'].includes(w.toLowerCase())).map(w=>w[0]).join('').slice(0,3).toUpperCase();
+  return `<svg class="badge" viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="${c[0]}" stroke="${c[1]}" stroke-width="2"/><text x="12" y="15.5" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="${ab.length>3?6.8:ab.length>2?8.5:10}" fill="${ink(c[0])}">${ab}</text></svg>`;}
+
+
+const pct = x => Math.round(x*100)+'%';
+const CODE={'England':'ENG','New Zealand':'NZ','Scotland':'SCO','Japan':'JPN','Ireland':'IRE','South Africa':'RSA','Italy':'ITA','Fiji':'FIJ','France':'FRA','Argentina':'ARG','Wales':'WAL','Australia':'AUS'};
+const half = x => (Math.round(Math.abs(x)*2)/2).toFixed(1);
+const fav = (h,a,line) => line<=0 ? `${CODE[h]||h} −${half(line)}` : `${CODE[a]||a} −${half(line)}`;  // line = home spread
+document.getElementById('upd').textContent = 'Updated ' + D.updated;
+
+function matchCard(m){
+  const [hc,ac] = pairCols(m.home,m.away);
+  const ih=1/m.mdh, ia=1/m.mda, s=ih+ia, mh=ih/s, ma=ia/s;
+  const hf = m.p_home>=m.p_away;
+  const readable = c => { const [r,g,b]=rgb(c); return (0.299*r+0.587*g+0.114*b)>150 || (isDark() && (0.299*r+0.587*g+0.114*b)<60) ? 'var(--ink)' : c; };
+  const tr = (t,sc,p,c,isFav)=>`<div class="trow${isFav?' fav':''}" style="--c:${readable(c)}">${flag(t,18)}<div class="nm">${t}</div><div class="sc">${sc}</div><div class="wp">${pct(p)}</div></div>`;
+  return `<article class="card">
+    <div class="m-top"><span>${m.venue}</span><span>Sat ${m.ko}</span></div>
+    <div class="m-teams">${tr(m.home,m.proj_home,m.p_home,hc,hf)}${tr(m.away,m.proj_away,m.p_away,ac,!hf)}</div>
+    <div class="bar" role="img" aria-label="${m.home} ${pct(m.p_home)}, draw ${pct(m.p_draw)}, ${m.away} ${pct(m.p_away)}"><i style="width:${m.p_home*100}%;background:${hc}"></i><i style="width:${m.p_draw*100}%;background:var(--draw)"></i><i style="width:${m.p_away*100}%;background:${ac}"></i></div>
+    <div class="drawl"><span>Projected score · win chance</span><span>Draw ${pct(m.p_draw)}</span></div>
+    <div class="vs">
+      <div class="hd"></div><div class="hd r">Gainline</div><div class="hd r">Market</div>
+      <div class="lab">Win</div><div class="r">${pct(m.p_home)} · ${pct(m.p_away)}</div><div class="r">${pct(mh)} · ${pct(ma)}</div>
+      <div class="lab">Spread</div><div class="r">${fav(m.home,m.away,m.spread)}</div><div class="r">${fav(m.home,m.away,m.mkt_spread)}</div>
+      <div class="lab">Total</div><div class="r">${m.total.toFixed(1)}</div><div class="r" style="color:var(--muted)">—</div>
+    </div>
+  </article>`;
+}
+function projections(){
+  return `<div class="eyebrow">Nations Championship · Sat 21 Nov</div><h1 class="h1">Round 6</h1>
+  <p class="sub">Projected score and win chance for each side. Market win % is the bookmaker price with its margin removed.</p>
+  <div class="grid three">${D.matches.map(matchCard).join('')}</div>
+  <p class="note">Market: PA sportsbook, 18 Nov. Projections update when team sheets are named on Thursday.</p>`;
+}
+
+let tryTeam='All';
+function tryScorers(){
+  const teams=['All',...new Set(D.tries.map(t=>t.team))];
+  const rows=D.tries.filter(t=>tryTeam==='All'||t.team===tryTeam).sort((a,b)=>b.p-a.p).map(t=>`<div class="row tr">${flag(t.team,16)}
+    <div><div class="t1">${t.name}</div><div class="t2" style="text-transform:capitalize">${t.team} · ${t.pos}</div></div>
+    <div class="meter" aria-hidden="true"><i style="width:${Math.min(t.p,1)*100}%;background:${tcol(t.team)}"></i></div>
+    <div class="big">${pct(t.p)}<small>${t.fair}</small></div></div>`).join('');
+  return `<h1 class="h1">Anytime try scorer</h1>
+  <p class="sub">Chance each player scores at least one try, with the equivalent odds underneath.</p>
+  <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===tryTeam}" data-team="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
+  <div class="list">${rows}</div>
+  <p class="note">Based on recent selections. Ireland, Italy, Japan and Fiji players are added when team sheets are named.</p>`;
+}
+
+let ratLg='Tests';
+function ratings(){
+  const sets={'Tests':D.intl.map(r=>({...r,kind:'flag'})),
+    'Top 14':D.club.filter(c=>c.league==='Top 14'),'Prem':D.club.filter(c=>c.league==='Prem'),'URC':D.club.filter(c=>c.league==='URC'),
+    'Super Rugby':D.sr};
+  const notes={'Tests':'Home advantage 4 points.','Top 14':'Home advantage 9 points, the biggest in rugby.','Prem':'Home advantage 7 points.',
+    'URC':'Home advantage 6 points. Top 14, Prem and URC share one scale through the European cups.',
+    'Super Rugby':'2027 preseason. Home advantage 1 point, +2 when visitors cross a border, +6 for the Drua in Fiji. Separate scale from Europe.'};
+  const list=[...sets[ratLg]].sort((a,b)=>b.rating-a.rating);
+  const a=Math.min(...list.map(r=>r.rating)), b=Math.max(...list.map(r=>r.rating));
+  const rows=list.map((r,i)=>`<div class="row rk"><div class="n">${i+1}</div>${ratLg==='Tests'?flag(r.team,16):badge(r.team,22)}<div class="t1">${r.team}</div>
+    <div class="meter"><i style="width:${8+92*(r.rating-a)/(b-a||1)}%;background:${tcol(r.team)}"></i></div><div class="big" style="font-size:17px">${r.rating>0?'+':''}${r.rating.toFixed(1)}</div></div>`).join('');
+  return `<h1 class="h1">Power ratings</h1>
+  <p class="sub">Points better than an average side on a neutral field. Rating gap plus home advantage gives the projected margin.</p>
+  <div class="filters" role="group" aria-label="Competition">${Object.keys(sets).map(l=>`<button type="button" aria-pressed="${l===ratLg}" data-rat="${l}">${l}</button>`).join('')}</div>
+  <div class="list">${rows}</div><p class="note">${notes[ratLg]}</p>`;
+}
+const gcol=g=>g>=80?'#16734a':g>=70?'#3f8f63':g>=60?'#7a8f3f':g>=50?'#b9861a':'#b2402f';
+let gTeam='All';
+function grades(){
+  const teams=['All',...new Set(D.grades.map(g=>g.team))];
+  const vals=Object.entries(D.grade_values).filter(([k])=>k!=='points').sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
+    .map(([k,v])=>`<span>${k.replace(/_/g,' ')} <b>${v>0?'+':''}${k==='metres_carried'?(v*10).toFixed(1)+'/10m':v.toFixed(2)}</b></span>`).join('');
+  const rows=D.grades.filter(g=>gTeam==='All'||g.team===gTeam).map(g=>`<div class="row gd"><div class="grade" style="background:${gcol(g.grade)}">${g.grade}</div>
+    <div><div class="t1">${g.name}</div><div class="t2"><span style="text-transform:capitalize">${CODE[g.team]||g.team} · ${g.pos}</span>${g.key?' · '+g.key:''}</div></div>
+    <div class="big" style="font-size:17px">${g.pa>0?'+':''}${g.pa.toFixed(1)}<small>pts</small></div></div>`).join('');
+  return `<h1 class="h1">Player grades</h1>
+  <p class="sub">${D.grades_match}. Points added = scoring plus what every other action adds to the margin. Grade ranks it by position across Tests: 60 average, 80+ elite.</p>
+  <details class="card vals"><summary>What each action is worth</summary><div class="values">${vals}</div></details>
+  <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===gTeam}" data-gteam="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
+  <div class="list">${rows}</div>`;
+}
+
+function method(){
+  const b=D.backtest;
+  return `<h1 class="h1">How it works</h1>
+  <div class="kpis">
+    <div class="card kpi"><b>${(b.intl_acc*100).toFixed(0)}%</b><span>Test winners called</span></div>
+    <div class="card kpi"><b>${b.intl_brier.toFixed(3)}</b><span>Brier, Tests</span></div>
+    <div class="card kpi"><b>${b.club_brier.toFixed(3)}</b><span>Brier, club</span></div>
+    <div class="card kpi"><b>${b.try_brier.toFixed(3)}</b><span>Brier, try scorer</span></div>
+    <div class="card kpi"><b>${b.sr_brier.toFixed(3)}</b><span>Brier, Super Rugby 2026</span></div>
+  </div>
+  <div class="card prose">
+    <p><b>Ratings.</b> Every team carries a rating in points that moves toward each result. Tests learn from every top-tier match since 1995.</p>
+    <p><b>Super Rugby.</b> Its own rating pool since 2022. Home advantage is small within a country and grows when the visitors cross the Tasman; the Drua get a large edge at home in Fiji.</p>
+    <p><b>Lineups.</b> Club matchday squads are rated player by player and compared with each side's usual strength.</p>
+    <p><b>Scores.</b> Attack and defence ratings project each side's points; the margin comes from the rating gap plus home advantage.</p>
+    <p><b>Try scorers.</b> Team expected tries, split by position and adjusted for each player's finishing record.</p>
+    <p><b>Testing.</b> Every number above is out of sample: each season is predicted using only the seasons before it.</p>
+  </div>`;
+}
+
+
+let BANK=1000; try{const v=localStorage.getItem('gl_bank'); if(v) BANK=+v;}catch(e){}
+const toDec = a => { const n=parseFloat(String(a).replace('−','-')); return n>0 ? 1+n/100 : 1+100/Math.abs(n); };
+const money = x => '$'+(x>=100?Math.round(x):x.toFixed(2));
+function bets(){
+  const B=D.betsTab;
+  const cards=B.bets.map(b=>{
+    const frac = b.qk*(b.tier==='Bet'?0.5:0.25);        // half or quarter of quarter-Kelly
+    const team = b.team;
+    return `<article class="card bet" style="border-left:4px solid ${tcol(team)}">
+      <div class="bet-top">${flag(team,18)}<span class="tier ${b.tier}">${b.tier}</span><span class="bet-price">${b.am}</span></div>
+      <div class="bet-name">${b.bet}</div>
+      <div class="bet-stats">
+        <div><b>+${(b.ev*100).toFixed(1)}%</b><span>EV</span></div>
+        <div><b>${b.min_am}</b><span>Worst</span></div>
+        <div><b>${(frac*100).toFixed(2)}%</b><span>Stake</span></div>
+        <div><b>${money(BANK*frac)}</b><span>Amount</span></div>
+      </div>
+      <p class="bet-why">Win chance ${pct(b.model)} model · ${pct(b.mkt)} market → ${pct(b.blend)} blended. ${b.why}</p>
+    </article>`}).join('');
+  const passes=B.passes.map(p=>`<div class="row pass"><div><div class="t1">${p.bet}</div><div class="t2" style="white-space:normal">${p.why}</div></div></div>`).join('');
+  const tries=B.tries.map(t=>{const d=toDec(t.bet_at); const f=0.05/(d-1)/8;
+    return `<div class="row tr">${flag(t.team,16)}<div><div class="t1">${t.name}</div><div class="t2">${t.team} · ${pct(t.p)} to score</div></div>
+      <div class="big" style="font-size:16px">${t.bet_at}<small>or longer</small></div><div class="big" style="font-size:15px">${money(BANK*f)}<small>${(f*100).toFixed(1)}%</small></div></div>`}).join('');
+  return `<div class="eyebrow">Private · remove before publishing</div><h1 class="h1">Bets · Round 6</h1>
+  <p class="sub">${B.rules}. Moneylines are draw-no-bet. Stakes are ⅛ Kelly (Lean: 1/16). Lines: ${B.lines}; recheck after Thursday's team sheets.</p>
+  <div class="card bank"><label for="bank">Bankroll</label><input id="bank" type="number" inputmode="decimal" min="0" step="50" value="${BANK}"></div>
+  <div class="grid">${cards}</div>
+  <div class="sec">Passes</div><div class="list">${passes}</div>
+  <div class="sec">Try scorers</div>
+  <p class="sub" style="margin-bottom:8px">Bet only at the price shown or longer. Cap all try props at 3% of bankroll combined. Wait for team sheets.</p>
+  <div class="list">${tries}</div>
+  <div class="card rules" style="margin-top:12px">Exposure: Australia −5.5 and any Australian try scorer are mostly the same bet. Size them as one position. Track every bet in the odds log so the model can be graded against the closing line.</div>`;
+}
+const VIEWS={'bets':bets,'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'method':method};
+function render(){
+  const v=(location.hash||'#projections').slice(1), view=VIEWS[v]?v:'projections';
+  document.getElementById('main').innerHTML=VIEWS[view]();
+  document.querySelectorAll('#nav a').forEach(a=>{const on=a.getAttribute('href')==='#'+view;a.setAttribute('aria-current',on?'page':'false');if(on)a.scrollIntoView({block:'nearest',inline:'center'});});
+}
+document.getElementById('main').addEventListener('change',e=>{if(e.target.id==='bank'){BANK=Math.max(0,+e.target.value||0);try{localStorage.setItem('gl_bank',BANK);}catch(_){}render();}});
+document.getElementById('main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; render();});
+window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0);});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+render();
+</script>
+</body>
+</html>

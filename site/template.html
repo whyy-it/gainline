@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gainline Rugby Projections</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Layout: masthead + tab bar, then one view at a time; match cards in a responsive grid, tables for ratings. */
+:root{
+  --bg:#f3f5f1; --surface:#ffffff; --ink:#13201b; --muted:#5d6b64; --line:#dde3dc;
+  --accent:#16734a; --accent-ink:#ffffff; --gold:#b9861a; --home:#16734a; --away:#3f5873; --draw:#a9b3ad;
+  --good:#16734a; --warn:#b9861a; --bad:#b2402f;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1714; --surface:#16211d; --ink:#e6ece8; --muted:#97a69e; --line:#26342e;
+  --accent:#3fb37a; --accent-ink:#06120c; --gold:#e0b24a; --home:#3fb37a; --away:#7d9cc0; --draw:#4d5a54;
+  --good:#3fb37a; --warn:#e0b24a; --bad:#e2735f; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f1714; --surface:#16211d; --ink:#e6ece8; --muted:#97a69e; --line:#26342e;
+  --accent:#3fb37a; --accent-ink:#06120c; --gold:#e0b24a; --home:#3fb37a; --away:#7d9cc0; --draw:#4d5a54;
+  --good:#3fb37a; --warn:#e0b24a; --bad:#e2735f; color-scheme:dark;}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);}
+.wrap{max-width:1120px;margin:0 auto;padding:0 18px}
+header{border-bottom:1px solid var(--line);background:var(--surface)}
+.mast{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:18px 0 10px}
+.logo{font:700 30px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
+.logo span{color:var(--accent)}
+.tag{color:var(--muted);font-size:13px}
+.updated{margin-left:auto;color:var(--muted);font-size:12px}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav a{font:600 16px/1 var(--display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-decoration:none;padding:12px 12px 11px;border-bottom:3px solid transparent;white-space:nowrap}
+nav a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+nav a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:22px 0 48px}
+h1{font:700 28px/1.1 var(--display);text-transform:uppercase;margin:0 0 4px;text-wrap:balance}
+.sub{color:var(--muted);margin:0 0 18px;max-width:70ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px}
+.mhead{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:10px}
+.teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px}
+.team{font:700 22px/1.05 var(--display);text-transform:uppercase}
+.team.r{text-align:right}
+.score{white-space:nowrap;font:700 30px/1 var(--display);font-variant-numeric:tabular-nums;text-align:center}
+.score small{display:block;font:500 11px var(--body);color:var(--muted);text-transform:none}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:12px 0 4px;background:var(--line)}
+.bar i{display:block}
+.pcts{display:flex;justify-content:space-between;font:600 13px var(--mono)}
+.pcts .d{color:var(--muted);font-weight:500}
+.mk{display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 10px;margin-top:12px;font-size:13px;border-top:1px solid var(--line);padding-top:10px}
+.mk div{font-variant-numeric:tabular-nums}
+.mk .h{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.chip{display:inline-block;font:600 11px var(--body);padding:2px 7px;border-radius:99px;border:1px solid currentColor}
+.chip.good{color:var(--good)} .chip.warn{color:var(--warn)} .chip.mute{color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th{font:600 12px var(--body);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid var(--line)}
+td.num,th.num{text-align:right}
+.tbl{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
+.rbar{height:8px;border-radius:4px;background:var(--accent);min-width:2px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.filters button{font:500 13px var(--body);padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.grade{display:inline-block;min-width:38px;text-align:center;font:700 16px var(--display);padding:2px 6px;border-radius:6px;color:#fff}
+.note{font-size:12px;color:var(--muted);margin-top:10px;max-width:80ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px}
+.kpi b{display:block;font:700 30px/1.1 var(--display)}
+.kpi span{font-size:12px;color:var(--muted)}
+.prob{display:flex;align-items:center;gap:8px}
+.prob .rbar{background:var(--gold)}
+
+.flag{border-radius:2px;box-shadow:0 0 0 1px var(--line);flex:none;vertical-align:-3px}
+.badge{flex:none;vertical-align:-6px}
+.tn{display:flex;flex-direction:column;gap:6px}
+.tn.r{align-items:flex-end;text-align:right}
+.tn .flag{width:36px;height:24px}
+.stripe{height:4px;border-radius:2px;width:44px}
+.who{display:inline-flex;align-items:center;gap:8px}
+.pcts span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.card.match{border-top-width:0;position:relative;overflow:hidden;padding-top:20px}
+.card.match:before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,var(--hc) 0 var(--hp),var(--draw) var(--hp) calc(var(--hp) + var(--dp)),var(--ac) calc(var(--hp) + var(--dp)) 100%)}
+.fav{font:600 11px var(--body);text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:4px}
+
+table.vs{margin-top:12px;border-top:1px solid var(--line);font-size:13px}
+table.vs th,table.vs td{padding:6px 4px;border-bottom:1px solid var(--line)}
+table.vs thead th{font-size:11px;padding-top:10px}
+table.vs tbody th{font:500 13px var(--body);color:var(--ink);text-transform:none;letter-spacing:0;white-space:nowrap}
+table.vs td{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.vs thead th:not(:first-child){text-align:right}
+table.vs small,.muted{color:var(--muted);font-size:11px}
+.dot{margin-right:6px}
+.pick{margin-top:12px;border-left:4px solid var(--pc);background:color-mix(in srgb,var(--pc) 10%,var(--surface));padding:8px 10px;border-radius:0 6px 6px 0;display:flex;flex-direction:column;gap:2px}
+.pick b{font:700 16px var(--display);text-transform:uppercase;letter-spacing:.02em}
+.pick span{font-size:12px;color:var(--muted)}
+.pick.none{--pc:var(--draw)}
+@media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="mast">
+      <div class="logo">Gain<span>line</span></div>
+      <div class="tag">Model-driven rugby union projections</div>
+      <div class="updated" id="upd"></div>
+    </div>
+    <nav id="nav" aria-label="Sections">
+      <a href="#projections">Projections</a>
+      <a href="#try-scorers">Try scorers</a>
+      <a href="#ratings">Power ratings</a>
+      <a href="#player-grades">Player grades</a>
+      <a href="#method">Method</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+<script>
+const D = __DATA__;
+// ---------- team identity: colours (kit-based) and flags ----------
+const TC = {
+ 'England':['#c8102e','#1d2a5c'], 'New Zealand':['#111111','#8a8d91','#e9ecef'], 'Scotland':['#1b2a5c','#6b8fd6'],
+ 'Japan':['#c8102e','#1b2a5c'], 'Ireland':['#169b62','#ff883e'], 'South Africa':['#e0a91b','#007a4d'],
+ 'Italy':['#1f6fd1','#0b2d5e'], 'Fiji':['#3a8fc4','#111111'], 'France':['#1b3a8c','#c8102e'], 'Argentina':['#74acdf','#1b3a8c'],
+ 'Wales':['#c8102e','#00a34a'], 'Australia':['#f2c300','#00843d'],
+ 'Toulouse':['#c8102e','#111'],'Bordeaux-Begles':['#7a1f3d','#fff'],'La Rochelle':['#f2c300','#111'],'Racing 92':['#6cb4e4','#fff'],
+ 'Stade Francais':['#e5007e','#1b2a5c'],'Toulon':['#c8102e','#111'],'Clermont Auvergne':['#f2c300','#1b2a5c'],'Montpellier':['#1b3a8c','#6cb4e4'],
+ 'Pau':['#00843d','#fff'],'Castres':['#1b3a8c','#fff'],'Bayonne':['#6cb4e4','#fff'],'Lyon':['#c8102e','#111'],'Perpignan':['#c8102e','#f2c300'],'Vannes':['#111','#2c6fbf'],
+ 'Bath':['#1b2a5c','#6cb4e4'],'Bristol Bears':['#1b2a5c','#c8102e'],'Exeter':['#111','#fff'],'Gloucester':['#a0162c','#fff'],'Harlequins':['#c2186b','#6cb4e4'],
+ 'Leicester Tigers':['#00754a','#c8102e'],'Newcastle':['#c8102e','#1b2a5c'],'Northampton':['#00513a','#c9a227'],'Sale Sharks':['#1b3a8c','#fff'],'Saracens':['#111','#c8102e'],
+ 'Leinster':['#1d4f91','#fff'],'Munster':['#c8102e','#fff'],'Ulster':['#ececec','#c8102e'],'Connacht':['#00843d','#111'],'Bulls':['#1d4f91','#fff'],
+ 'Stormers':['#1d4f91','#fff'],'Sharks':['#111','#fff'],'Lions':['#c8102e','#fff'],'Glasgow Warriors':['#1b2a5c','#f2a900'],'Edinburgh':['#7a1f3d','#111'],
+ 'Benetton':['#00843d','#fff'],'Zebre':['#111','#f2c300'],'Cardiff':['#1d4f91','#111'],'Ospreys':['#111','#fff'],'Scarlets':['#c8102e','#fff'],'Dragons':['#c8102e','#111']
+};
+const isDark = () => document.documentElement.dataset.theme==='dark' || (document.documentElement.dataset.theme!=='light' && matchMedia('(prefers-color-scheme: dark)').matches);
+function tcol(t){const c=TC[t]||['#5d6b64','#999'];return (isDark()&&c[2])?c[2]:c[0];}
+function rgb(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(x=>x+x).join('');return [0,2,4].map(i=>parseInt(h.substr(i,2),16));}
+function dist(a,b){const x=rgb(a),y=rgb(b);return Math.hypot(x[0]-y[0],x[1]-y[1],x[2]-y[2]);}
+function pairCols(h,a){const ch=tcol(h);let ca=tcol(a);if(dist(ch,ca)<120){ca=(TC[a]||[])[1]||'#888';}return [ch,ca];}
+function ink(bg){const [r,g,b]=rgb(bg);return (0.299*r+0.587*g+0.114*b)>150?'#111':'#fff';}
+const UJ = '<g transform="scale(.25 .3334)"><rect width="60" height="30" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" stroke="#C8102E" stroke-width="2"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></g>';
+function star(cx,cy,r,fill,stroke){let p='';for(let i=0;i<10;i++){const a=Math.PI/5*i-Math.PI/2,rr=i%2?r*.42:r;p+=(i?'L':'M')+(cx+rr*Math.cos(a)).toFixed(2)+','+(cy+rr*Math.sin(a)).toFixed(2);}return `<path d="${p}Z" fill="${fill}"${stroke?` stroke="${stroke}" stroke-width=".5"`:''}/>`;}
+const FLAG = {
+ 'England':'<rect width="30" height="20" fill="#fff"/><path d="M15,0v20M0,10h30" stroke="#CE1124" stroke-width="4"/>',
+ 'Scotland':'<rect width="30" height="20" fill="#005EB8"/><path d="M0,0 30,20M30,0 0,20" stroke="#fff" stroke-width="3.2"/>',
+ 'Wales':'<rect width="30" height="10" fill="#fff"/><rect y="10" width="30" height="10" fill="#00B140"/><path d="M7,14 C8,9 12,7 15,8.5 L17.5,5 L17.8,8.6 C20.5,8 23,9.5 23,12 L21,11.6 L20.5,14 L18.6,12.8 L17,15.5 L15.5,13.4 L13,15.8 L12,13.6 L9.5,15.6 Z" fill="#D30731"/>',
+ 'Ireland':'<rect width="10" height="20" fill="#169B62"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#FF883E"/>',
+ 'France':'<rect width="10" height="20" fill="#002395"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#ED2939"/>',
+ 'Italy':'<rect width="10" height="20" fill="#009246"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#CE2B37"/>',
+ 'Japan':'<rect width="30" height="20" fill="#fff"/><circle cx="15" cy="10" r="6" fill="#BC002D"/>',
+ 'Argentina':'<rect width="30" height="20" fill="#74ACDF"/><rect y="6.67" width="30" height="6.67" fill="#fff"/><circle cx="15" cy="10" r="2.2" fill="#F6B40E" stroke="#85340A" stroke-width=".3"/>',
+ 'South Africa':'<rect width="30" height="10" fill="#E03C31"/><rect y="10" width="30" height="10" fill="#001489"/><path d="M0,0 12,10 0,20M12,10H30" stroke="#fff" stroke-width="6.6" fill="none"/><path d="M0,0 12,10 0,20M12,10H30" stroke="#007749" stroke-width="4" fill="none"/><path d="M0,2.6 9.2,10 0,17.4Z" fill="#FFB81C"/><path d="M0,4.4 7,10 0,15.6Z" fill="#000"/>',
+ 'New Zealand':'<rect width="30" height="20" fill="#012169"/>'+'UJ'+star(22,5.2,1.4,'#C8102E','#fff')+star(25,9.4,1.4,'#C8102E','#fff')+star(19.6,10.4,1.2,'#C8102E','#fff')+star(22,15.4,1.6,'#C8102E','#fff'),
+ 'Australia':'<rect width="30" height="20" fill="#012169"/>'+'UJ'+star(7.5,15,2.4,'#fff')+star(22.5,16.2,1.4,'#fff')+star(18.6,9,1.3,'#fff')+star(22.5,3.6,1.3,'#fff')+star(26.2,7.8,1.3,'#fff')+star(24.4,11,.7,'#fff'),
+ 'Fiji':'<rect width="30" height="20" fill="#68BFE5"/>'+'UJ'+'<path d="M18.5,5h7v6.5c0,2.6-3.5,4-3.5,4s-3.5-1.4-3.5-4Z" fill="#fff" stroke="#C8102E" stroke-width=".4"/><rect x="18.5" y="5" width="7" height="2.2" fill="#C8102E"/>'
+};
+function flag(t,h=16){if(!FLAG[t])return badge(t,h+4);return `<svg class="flag" viewBox="0 0 30 20" width="${h*1.5}" height="${h}" aria-hidden="true">${FLAG[t].replace('UJ',UJ)}</svg>`;}
+const AB={'La Rochelle':'LR','Racing 92':'R92','Bordeaux-Begles':'UBB','Stade Francais':'SF','Clermont Auvergne':'ASM','Leicester Tigers':'LEI','Bristol Bears':'BRI','Glasgow Warriors':'GLA','Sale Sharks':'SAL','Harlequins':'HQ','Northampton':'NOR','Saracens':'SAR','Gloucester':'GLO','Newcastle':'NEW','Exeter':'EXE','Bath':'BAT','Toulouse':'ST','Toulon':'RCT','Montpellier':'MHR','Castres':'CO','Bayonne':'AB','Lyon':'LOU','Perpignan':'USAP','Vannes':'RCV','Pau':'SP','Leinster':'LEI','Munster':'MUN','Ulster':'ULS','Connacht':'CON','Bulls':'BUL','Stormers':'STO','Sharks':'SHA','Lions':'LIO','Edinburgh':'EDI','Benetton':'BEN','Zebre':'ZEB','Cardiff':'CAR','Ospreys':'OSP','Scarlets':'SCA','Dragons':'DRA'};
+function badge(t,s=22){const c=TC[t]||['#5d6b64','#fff'];const ab=AB[t]||t.replace(/-/g,' ').split(' ').filter(w=>!['de','des','la','le','rugby'].includes(w.toLowerCase())).map(w=>w[0]).join('').slice(0,3).toUpperCase();
+  return `<svg class="badge" viewBox="0 0 24 24" width="${s}" height="${s}" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="${c[0]}" stroke="${c[1]}" stroke-width="2"/><text x="12" y="15.5" text-anchor="middle" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" font-size="${ab.length>3?6.8:ab.length>2?8.5:10}" fill="${ink(c[0])}">${ab}</text></svg>`;}
+
+const pct = x => (x*100).toFixed(0)+'%';
+const pct1 = x => (x*100).toFixed(1)+'%';
+const fmtLine = (team,l) => `${team} ${l>0?'+':''}${(Math.round(l*2)/2).toFixed(1)}`;
+document.getElementById('upd').textContent = 'Updated ' + D.updated;
+
+
+const CODE={'England':'ENG','New Zealand':'NZ','Scotland':'SCO','Japan':'JPN','Ireland':'IRE','South Africa':'RSA','Italy':'ITA','Fiji':'FIJ','France':'FRA','Argentina':'ARG','Wales':'WAL','Australia':'AUS'};
+function sp(team,l,short){return `${short?(CODE[team]||team):team} ${l>0?'+':l<0?'−':''}${Math.abs(Math.round(l*2)/2).toFixed(1)}`;}
+function marketBox(m,hc,ac){
+  const ih=1/m.mdh, ia=1/m.mda, s=ih+ia, mh=ih/s, ma=ia/s;            // market win % (vig removed, draw ignored)
+  const mFav = m.mkt_spread<0 ? sp(m.home,m.mkt_spread,1) : sp(m.away,-m.mkt_spread,1);
+  const oFav = m.spread<0 ? sp(m.home,m.spread,1) : sp(m.away,-m.spread,1);
+
+  const row=(lab,a,b,hl)=>`<tr${hl?' class="hl"':''}><th scope="row">${lab}</th><td>${a}</td><td>${b}</td></tr>`;
+  return `<table class="vs"><thead><tr><th></th><th scope="col">Gainline</th><th scope="col">Market</th></tr></thead><tbody>
+    ${row(`<span class="dot" style="background:${hc}"></span>${m.home} win`, pct(m.p_home), `${pct(mh)} <small>${m.mkt_home}</small>`)}
+    ${row(`<span class="dot" style="background:${ac}"></span>${m.away} win`, pct(m.p_away), `${pct(ma)} <small>${m.mkt_away}</small>`)}
+    ${row('Spread', oFav, mFav)}
+    ${row('Total', m.total.toFixed(1), '<span class="muted">Not posted</span>')}
+  </tbody></table>`;
+}
+function projections(){
+  const cards = D.matches.map(m=>{
+    const modelSpread = m.spread, mkt = m.mkt_spread, gap = (mkt - modelSpread);
+    const [hc,ac] = pairCols(m.home,m.away);
+    const fav = m.p_home>=m.p_away ? [m.home,hc,m.p_home] : [m.away,ac,m.p_away];
+    return `<article class="card match" style="--hc:${hc};--ac:${ac};--hp:${(m.p_home*100).toFixed(1)}%;--dp:${(m.p_draw*100).toFixed(1)}%">
+      <div class="mhead"><span>${m.venue}</span><span>${m.ko}</span></div>
+      <div class="teams">
+        <div class="tn">${flag(m.home,24)}<div class="team">${m.home}</div><div class="stripe" style="background:${hc}"></div></div>
+        <div class="score">${m.proj_home}–${m.proj_away}<small>projected</small></div>
+        <div class="tn r">${flag(m.away,24)}<div class="team r">${m.away}</div><div class="stripe" style="background:${ac}"></div></div></div>
+      <div class="bar" role="img" aria-label="Win probability ${m.home} ${pct(m.p_home)}, draw ${pct(m.p_draw)}, ${m.away} ${pct(m.p_away)}">
+        <i style="width:${m.p_home*100}%;background:${hc}"></i><i style="width:${m.p_draw*100}%;background:var(--draw)"></i><i style="width:${m.p_away*100}%;background:${ac}"></i></div>
+      <div class="pcts"><span><i class="dot" style="background:${hc}"></i>${pct(m.p_home)}</span><span class="d">Draw ${pct(m.p_draw)}</span><span>${pct(m.p_away)}<i class="dot" style="background:${ac}"></i></span></div>
+      <div style="margin-top:8px"><span class="fav" style="background:${fav[1]};color:${ink(fav[1])}">${fav[0]} ${pct(fav[2])} to win</span></div>
+      ${marketBox(m,hc,ac)}
+    </article>`}).join('');
+  return `<h1>${D.round}</h1>
+  <p class="sub">Win probability and projected score from the Gainline rating model, next to the current market. Market win % is the bookmaker's price with the margin removed.</p>
+  <div class="grid">${cards}</div>
+  <p class="note">Market prices: Sportingbet board, 17 Nov. Lineups are not yet announced; projections update when team sheets drop.</p>`;
+}
+
+let tryTeam = 'All';
+function tryScorers(){
+  const teams = ['All',...new Set(D.tries.map(t=>t.team))];
+  const rows = D.tries.filter(t=>tryTeam==='All'||t.team===tryTeam).sort((a,b)=>b.p-a.p).map(t=>`<tr>
+    <td>${t.name}</td><td><span class="who">${flag(t.team,14)}${t.team}</span></td><td style="text-transform:capitalize">${t.pos}</td>
+    <td><div class="prob"><div class="rbar" style="width:${t.p*120}px;background:${tcol(t.team)};box-shadow:inset 0 0 0 1px var(--line)"></div><b>${pct(t.p)}</b></div></td>
+    <td class="num">${t.fair}</td></tr>`).join('');
+  return `<h1>Anytime try scorer</h1>
+  <p class="sub">Team expected tries × position share × player finishing record.</p>
+  <div class="filters" role="group" aria-label="Filter by team">${teams.map(t=>`<button type="button" aria-pressed="${t===tryTeam}" data-team="${t}">${t!=='All'?flag(t,12)+' ':''}${t}</button>`).join('')}</div>
+  <div class="tbl"><table><thead><tr><th>Player</th><th>Team</th><th>Position</th><th>Chance</th><th class="num">Equivalent odds</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="note">Preview based on recent selections. Ireland, Italy, Japan and Fiji players appear once team sheets are announced.</p>`;
+}
+
+let clubLg = 'All';
+function ratings(){
+  const imax = Math.max(...D.intl.map(r=>r.rating)), imin = Math.min(...D.intl.map(r=>r.rating));
+  const w = r => 8 + 140*(r-imin)/(imax-imin);
+  const intl = D.intl.map((r,i)=>`<tr><td>${i+1}</td><td><span class="who">${flag(r.team,14)}${r.team}</span></td><td><div class="rbar" style="width:${w(r.rating)}px;background:${tcol(r.team)};box-shadow:inset 0 0 0 1px var(--line)"></div></td><td class="num">${r.rating>0?'+':''}${r.rating.toFixed(1)}</td></tr>`).join('');
+  const lgs = ['All','Top 14','Prem','URC'];
+  const cl = D.club.filter(c=>clubLg==='All'||c.league===clubLg).sort((a,b)=>b.rating-a.rating);
+  const cmax = Math.max(...D.club.map(r=>r.rating)), cmin = Math.min(...D.club.map(r=>r.rating));
+  const cw = r => 8 + 140*(r-cmin)/(cmax-cmin);
+  const club = cl.map((r,i)=>`<tr><td>${i+1}</td><td><span class="who">${badge(r.team,22)}${r.team}</span></td><td>${r.league}</td><td><div class="rbar" style="width:${cw(r.rating)}px;background:${tcol(r.team)};box-shadow:inset 0 0 0 1px var(--line)"></div></td><td class="num">${r.rating>0?'+':''}${r.rating.toFixed(1)}</td></tr>`).join('');
+  return `<h1>Power ratings</h1>
+  <p class="sub">Points better or worse than an average side on a neutral field. The gap between two ratings, plus home advantage, is the projected margin.</p>
+  <div class="two">
+    <section><h2 style="font:700 20px var(--display);text-transform:uppercase;margin:0 0 8px">Nations Championship</h2>
+      <div class="tbl"><table><thead><tr><th>#</th><th>Team</th><th></th><th class="num">Rating</th></tr></thead><tbody>${intl}</tbody></table></div></section>
+    <section><h2 style="font:700 20px var(--display);text-transform:uppercase;margin:0 0 8px">Club</h2>
+      <div class="filters" role="group" aria-label="Filter by league">${lgs.map(l=>`<button type="button" aria-pressed="${l===clubLg}" data-lg="${l}">${l}</button>`).join('')}</div>
+      <div class="tbl"><table><thead><tr><th>#</th><th>Team</th><th>League</th><th></th><th class="num">Rating</th></tr></thead><tbody>${club}</tbody></table></div></section>
+  </div>
+  <p class="note">Home advantage: Tests 4 pts · Top 14 9 · Prem 7 · URC 6 · Europe 6.</p>`;
+}
+
+const gcol = g => g>=80?'var(--good)':g>=65?'#4f8f6d':g>=50?'var(--warn)':'var(--bad)';
+let gTeam='All';
+function grades(){
+  const teams=['All',...new Set(D.grades.map(g=>g.team))];
+  const rows = D.grades.filter(g=>gTeam==='All'||g.team===gTeam).map(g=>`<tr><td><span class="grade" style="background:${gcol(g.grade)}">${g.grade}</span></td>
+    <td>${g.name}</td><td><span class="who">${flag(g.team,14)}${g.team}</span></td><td style="text-transform:capitalize">${g.pos}</td><td class="num">${g.pa>0?'+':''}${g.pa.toFixed(1)}</td><td style="color:var(--muted);font-size:13px">${g.key||'—'}</td></tr>`).join('');
+  return `<h1>Player grades</h1>
+  <p class="sub">${D.grades_match}. Points added counts what each player did in scoreboard points: points scored at face value, 2.5 per try assist, and every other action at the value it adds to the final margin across 4,500 club and Test matches. The grade ranks that total against everyone in the same position across Tests since 2022: 60 is average, 80+ is elite.</p>
+  <div class="card" style="margin-bottom:14px;font-size:13px"><b>What actions are worth:</b> ${Object.entries(D.grade_values).filter(([k])=>k!=='points').sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).map(([k,v])=>`${k.replace(/_/g,' ')} <b>${v>0?'+':''}${k==='metres_carried'?(v*10).toFixed(1)+' per 10 m':v.toFixed(2)}</b>`).join(' · ')}</div>
+  <div class="filters" role="group" aria-label="Filter by team">${teams.map(t=>`<button type="button" aria-pressed="${t===gTeam}" data-gteam="${t}">${t!=='All'?flag(t,12)+' ':''}${t}</button>`).join('')}</div>
+  <div class="tbl"><table><thead><tr><th>Grade</th><th>Player</th><th>Team</th><th>Role</th><th class="num">Pts added</th><th>Key stats</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <p class="note">Demo uses the most recent Test with full player data. Replacements are graded against other replacements.</p>`;
+}
+
+function method(){
+  const b=D.backtest;
+  return `<h1>How the model works</h1>
+  <div class="kpis">
+    <div class="card kpi"><b>${pct1(b.intl_acc)}</b><span>Test winners called, 2024–26</span></div>
+    <div class="card kpi"><b>${b.intl_brier.toFixed(3)}</b><span>Brier score, tier-1 Tests</span></div>
+    <div class="card kpi"><b>${b.club_brier.toFixed(3)}</b><span>Brier score, club games</span></div>
+    <div class="card kpi"><b>${b.try_brier.toFixed(3)}</b><span>Brier score, anytime try scorer</span></div>
+  </div>
+  <div class="card" style="max-width:75ch">
+    <p><b>Ratings.</b> Every team carries a rating in points. After each match it moves toward the result, by a tenth of the error for Tests and six hundredths for clubs. Club ratings regress 20% toward average each summer.</p>
+    <p><b>Scores and totals.</b> Separate attack and defence ratings project each side's points; the margin comes from the rating gap plus home advantage.</p>
+    <p><b>Squad strength.</b> Matchday squads are compared with each team's regular top 23. Heavily rotated sides have underperformed the model line by 6.6 points across 423 club games.</p>
+    <p><b>Try scorers.</b> Team expected tries come from the projected margin, split by position share and adjusted for each player's finishing record.</p>
+    <p><b>Testing.</b> All scores above are out of sample: each season is predicted using only the seasons before it.</p>
+  </div>`;
+}
+
+const VIEWS = {'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'method':method};
+function render(){
+  const v = (location.hash||'#projections').slice(1); const view = VIEWS[v]?v:'projections';
+  document.getElementById('main').innerHTML = VIEWS[view]();
+  document.querySelectorAll('#nav a').forEach(a=>a.setAttribute('aria-current', a.getAttribute('href')==='#'+view?'page':'false'));
+}
+document.getElementById('main').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.dataset.team){tryTeam=b.dataset.team;} if(b.dataset.lg){clubLg=b.dataset.lg;} if(b.dataset.gteam){gTeam=b.dataset.gteam;}
+  render();
+});
+window.addEventListener('hashchange', render); matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render); new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']}); render();
+</script>
+</body>
+</html>

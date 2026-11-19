@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1714">
+<title>Gainline Rugby Projections</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: phone-first. Sticky masthead + scrollable tab strip; one column of compact cards; 2-3 columns from 720px. */
+:root{
+  --bg:#f2f4f0; --surface:#fff; --ink:#111a16; --muted:#64716a; --line:#e2e7e1; --soft:#f6f8f5;
+  --accent:#16734a; --accent-ink:#fff; --draw:#b7c0ba;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1411; --surface:#151f1b; --ink:#e8eeea; --muted:#94a39b; --line:#24312b; --soft:#1a2621;
+  --accent:#3fb37a; --accent-ink:#06120c; --draw:#4a5751; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0d1411; --surface:#151f1b; --ink:#e8eeea; --muted:#94a39b; --line:#24312b; --soft:#1a2621;
+  --accent:#3fb37a; --accent-ink:#06120c; --draw:#4a5751; color-scheme:dark;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--body);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;padding:0 max(14px,env(safe-area-inset-left)) 0 max(14px,env(safe-area-inset-right))}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.mast{display:flex;align-items:center;gap:10px;height:46px}
+.logo{font:700 24px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
+.logo span{color:var(--accent)}
+.upd{margin-left:auto;font-size:11px;color:var(--muted)}
+nav{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 -4px}
+nav::-webkit-scrollbar{display:none}
+nav a{flex:none;font:600 14px/1 var(--display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-decoration:none;padding:9px 8px 10px;border-bottom:2.5px solid transparent}
+nav a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+main{padding:16px 0 calc(28px + env(safe-area-inset-bottom))}
+.eyebrow{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.h1{font:700 22px/1.05 var(--display);text-transform:uppercase;margin:0 0 4px;text-wrap:balance}
+.sub{color:var(--muted);font-size:12.5px;margin:0 0 14px;max-width:62ch}
+.grid{display:grid;gap:10px}
+@media (min-width:720px){.grid{grid-template-columns:repeat(2,1fr)} .eyebrow{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
+.h1{font-size:28px}}
+@media (min-width:1020px){.grid.three{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+/* match card */
+.m-top{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:10px 12px 0}
+.m-teams{padding:6px 12px 4px}
+.trow{display:grid;grid-template-columns:28px 1fr auto 46px;align-items:center;gap:8px;height:34px}
+.trow .nm{font:700 19px/1 var(--display);text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trow .sc{font:700 22px/1 var(--display);min-width:26px;text-align:right}
+.trow .wp{font:600 13px/1 var(--body);text-align:right;padding:4px 0;border-radius:6px}
+.trow.fav .wp{color:var(--c);}
+.trow:not(.fav) .nm,.trow:not(.fav) .sc{color:var(--muted)}
+.bar{display:flex;height:6px;margin:6px 12px 0;border-radius:3px;overflow:hidden;background:var(--line)}
+.bar i{display:block}
+.drawl{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);padding:4px 12px 0}
+.vs{display:grid;grid-template-columns:auto 1fr 1fr;margin-top:10px;border-top:1px solid var(--line);background:var(--soft);font-size:12.5px}
+.vs > div{padding:7px 12px;border-bottom:1px solid var(--line)}
+.vs > div:nth-last-child(-n+3){border-bottom:0}
+.vs .hd{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-top:8px;padding-bottom:6px}
+.vs .r{text-align:right;white-space:nowrap}
+.vs .lab{color:var(--muted)}
+.vs small{color:var(--muted);font-size:10.5px;margin-left:3px}
+.flag{border-radius:2px;box-shadow:0 0 0 1px var(--line);display:block}
+.badge{display:block}
+/* list rows (try scorers, ratings, grades) */
+.filters{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -14px 10px;padding:0 14px}
+.filters::-webkit-scrollbar{display:none}
+.filters button{flex:none;display:inline-flex;align-items:center;gap:6px;font:500 12.5px var(--body);height:30px;padding:0 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.filters button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.row{display:grid;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);min-height:48px}
+.row:last-child{border-bottom:0}
+.row > *{min-width:0}
+.row .t1{font-weight:600;font-size:14px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .t2{font-size:11.5px;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .big{font:700 19px/1 var(--display);text-align:right;white-space:nowrap}
+.row .big small{display:block;font:500 10.5px var(--body);color:var(--muted);margin-top:3px}
+.tr{grid-template-columns:22px minmax(0,1fr) 64px 50px}
+.meter{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.meter i{display:block;height:100%}
+.rk{grid-template-columns:18px 24px minmax(0,1fr) 70px 50px}
+.rk .n{color:var(--muted);font-size:12px;text-align:right}
+.gd{grid-template-columns:42px minmax(0,1fr) 50px}
+.grade{display:grid;place-items:center;height:32px;border-radius:8px;font:700 18px/1 var(--display);color:#fff}
+.sec{font:700 16px var(--display);text-transform:uppercase;letter-spacing:.03em;margin:18px 0 8px}
+.two{display:grid;gap:4px}
+@media (min-width:860px){.two{grid-template-columns:1fr 1fr;gap:16px}.two .sec:first-child{margin-top:0}}
+.note{font-size:11px;color:var(--muted);margin:10px 2px 0;max-width:70ch}
+.vals{margin:0 0 12px}
+.vals summary{cursor:pointer;padding:10px 12px;font-weight:600;font-size:13px;list-style:none;display:flex;justify-content:space-between}
+.vals summary::after{content:'+';color:var(--muted);font-weight:500}
+.vals[open] summary::after{content:'−'}
+.vals summary::-webkit-details-marker{display:none}
+.values{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.values span{font-size:11.5px;padding:4px 8px;border-radius:6px;background:var(--soft);border:1px solid var(--line)}
+.values b{font-weight:600}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+@media (min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{padding:12px}
+.kpi b{display:block;font:700 26px/1 var(--display)}
+.kpi span{font-size:11.5px;color:var(--muted)}
+.prose{padding:14px 14px 4px;font-size:13.5px;max-width:68ch}
+.prose p{margin:0 0 10px}
+
+.bet{padding:12px;display:grid;gap:8px}
+.bet-top{display:flex;align-items:center;gap:8px}
+.tier{font:600 10.5px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:99px}
+.tier.Bet{background:var(--accent);color:var(--accent-ink)} .tier.Lean{background:var(--soft);color:var(--muted);border:1px solid var(--line)}
+.bet-name{font:700 21px/1 var(--display);text-transform:uppercase}
+.bet-price{margin-left:auto;font:700 21px/1 var(--display)}
+.bet-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.bet-stats div{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+.bet-stats b{display:block;font:700 16px/1.1 var(--display)}
+.bet-stats span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.bet-why{font-size:12.5px;color:var(--muted);margin:0}
+.bank{display:flex;align-items:center;gap:8px;padding:10px 12px;margin-bottom:10px}
+.bank label{font-size:12.5px;color:var(--muted)}
+.bank input{margin-left:auto;width:110px;font:600 15px var(--body);padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);text-align:right}
+.pass{grid-template-columns:1fr}
+.rules{font-size:12px;color:var(--muted);padding:10px 12px;line-height:1.5}
+@media (prefers-reduced-motion:no-preference){.bar i,.meter i{transition:width .35s}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="mast"><div class="logo">Gain<span>line</span></div><div class="upd" id="upd"></div></div>
+    <nav id="nav" aria-label="Sections">
+      <a href="#projections">Matches</a><a href="#try-scorers">Tries</a><a href="#ratings">Ratings</a><a href="#player-grades">Grades</a><a href="#bets">Bets</a><a href="#method">Method</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap" id="main"></main>
+<script>
+const D = __DATA__;
+__TEAMJS__
+const pct = x => Math.round(x*100)+'%';
+const CODE={'England':'ENG','New Zealand':'NZ','Scotland':'SCO','Japan':'JPN','Ireland':'IRE','South Africa':'RSA','Italy':'ITA','Fiji':'FIJ','France':'FRA','Argentina':'ARG','Wales':'WAL','Australia':'AUS'};
+const half = x => (Math.round(Math.abs(x)*2)/2).toFixed(1);
+const fav = (h,a,line) => line<=0 ? `${CODE[h]||h} −${half(line)}` : `${CODE[a]||a} −${half(line)}`;  // line = home spread
+document.getElementById('upd').textContent = 'Updated ' + D.updated;
+
+function matchCard(m){
+  const [hc,ac] = pairCols(m.home,m.away);
+  const ih=1/m.mdh, ia=1/m.mda, s=ih+ia, mh=ih/s, ma=ia/s;
+  const hf = m.p_home>=m.p_away;
+  const readable = c => { const [r,g,b]=rgb(c); return (0.299*r+0.587*g+0.114*b)>150 || (isDark() && (0.299*r+0.587*g+0.114*b)<60) ? 'var(--ink)' : c; };
+  const tr = (t,sc,p,c,isFav)=>`<div class="trow${isFav?' fav':''}" style="--c:${readable(c)}">${flag(t,18)}<div class="nm">${t}</div><div class="sc">${sc}</div><div class="wp">${pct(p)}</div></div>`;
+  return `<article class="card">
+    <div class="m-top"><span>${m.venue}</span><span>Sat ${m.ko}</span></div>
+    <div class="m-teams">${tr(m.home,m.proj_home,m.p_home,hc,hf)}${tr(m.away,m.proj_away,m.p_away,ac,!hf)}</div>
+    <div class="bar" role="img" aria-label="${m.home} ${pct(m.p_home)}, draw ${pct(m.p_draw)}, ${m.away} ${pct(m.p_away)}"><i style="width:${m.p_home*100}%;background:${hc}"></i><i style="width:${m.p_draw*100}%;background:var(--draw)"></i><i style="width:${m.p_away*100}%;background:${ac}"></i></div>
+    <div class="drawl"><span>Projected score · win chance</span><span>Draw ${pct(m.p_draw)}</span></div>
+    <div class="vs">
+      <div class="hd"></div><div class="hd r">Gainline</div><div class="hd r">Market</div>
+      <div class="lab">Win</div><div class="r">${pct(m.p_home)} · ${pct(m.p_away)}</div><div class="r">${pct(mh)} · ${pct(ma)}</div>
+      <div class="lab">Spread</div><div class="r">${fav(m.home,m.away,m.spread)}</div><div class="r">${fav(m.home,m.away,m.mkt_spread)}</div>
+      <div class="lab">Total</div><div class="r">${m.total.toFixed(1)}</div><div class="r" style="color:var(--muted)">—</div>
+    </div>
+  </article>`;
+}
+function projections(){
+  return `<div class="eyebrow">Nations Championship · Sat 21 Nov</div><h1 class="h1">Round 6</h1>
+  <p class="sub">Projected score and win chance for each side. Market win % is the bookmaker price with its margin removed.</p>
+  <div class="grid three">${D.matches.map(matchCard).join('')}</div>
+  <p class="note">Market: PA sportsbook, 18 Nov. Projections update when team sheets are named on Thursday.</p>`;
+}
+
+let tryTeam='All';
+function tryScorers(){
+  const teams=['All',...new Set(D.tries.map(t=>t.team))];
+  const rows=D.tries.filter(t=>tryTeam==='All'||t.team===tryTeam).sort((a,b)=>b.p-a.p).map(t=>`<div class="row tr">${flag(t.team,16)}
+    <div><div class="t1">${t.name}</div><div class="t2" style="text-transform:capitalize">${t.team} · ${t.pos}</div></div>
+    <div class="meter" aria-hidden="true"><i style="width:${Math.min(t.p,1)*100}%;background:${tcol(t.team)}"></i></div>
+    <div class="big">${pct(t.p)}<small>${t.fair}</small></div></div>`).join('');
+  return `<h1 class="h1">Anytime try scorer</h1>
+  <p class="sub">Chance each player scores at least one try, with the equivalent odds underneath.</p>
+  <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===tryTeam}" data-team="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
+  <div class="list">${rows}</div>
+  <p class="note">Based on recent selections. Ireland, Italy, Japan and Fiji players are added when team sheets are named.</p>`;
+}
+
+let ratLg='Tests';
+function ratings(){
+  const sets={'Tests':D.intl.map(r=>({...r,kind:'flag'})),
+    'Top 14':D.club.filter(c=>c.league==='Top 14'),'Prem':D.club.filter(c=>c.league==='Prem'),'URC':D.club.filter(c=>c.league==='URC'),
+    'Super Rugby':D.sr};
+  const notes={'Tests':'Home advantage 4 points.','Top 14':'Home advantage 9 points, the biggest in rugby.','Prem':'Home advantage 7 points.',
+    'URC':'Home advantage 6 points. Top 14, Prem and URC share one scale through the European cups.',
+    'Super Rugby':'2027 preseason. Home advantage 1 point, +2 when visitors cross a border, +6 for the Drua in Fiji. Separate scale from Europe.'};
+  const list=[...sets[ratLg]].sort((a,b)=>b.rating-a.rating);
+  const a=Math.min(...list.map(r=>r.rating)), b=Math.max(...list.map(r=>r.rating));
+  const rows=list.map((r,i)=>`<div class="row rk"><div class="n">${i+1}</div>${ratLg==='Tests'?flag(r.team,16):badge(r.team,22)}<div class="t1">${r.team}</div>
+    <div class="meter"><i style="width:${8+92*(r.rating-a)/(b-a||1)}%;background:${tcol(r.team)}"></i></div><div class="big" style="font-size:17px">${r.rating>0?'+':''}${r.rating.toFixed(1)}</div></div>`).join('');
+  return `<h1 class="h1">Power ratings</h1>
+  <p class="sub">Points better than an average side on a neutral field. Rating gap plus home advantage gives the projected margin.</p>
+  <div class="filters" role="group" aria-label="Competition">${Object.keys(sets).map(l=>`<button type="button" aria-pressed="${l===ratLg}" data-rat="${l}">${l}</button>`).join('')}</div>
+  <div class="list">${rows}</div><p class="note">${notes[ratLg]}</p>`;
+}
+const gcol=g=>g>=80?'#16734a':g>=70?'#3f8f63':g>=60?'#7a8f3f':g>=50?'#b9861a':'#b2402f';
+let gTeam='All';
+function grades(){
+  const teams=['All',...new Set(D.grades.map(g=>g.team))];
+  const vals=Object.entries(D.grade_values).filter(([k])=>k!=='points').sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
+    .map(([k,v])=>`<span>${k.replace(/_/g,' ')} <b>${v>0?'+':''}${k==='metres_carried'?(v*10).toFixed(1)+'/10m':v.toFixed(2)}</b></span>`).join('');
+  const rows=D.grades.filter(g=>gTeam==='All'||g.team===gTeam).map(g=>`<div class="row gd"><div class="grade" style="background:${gcol(g.grade)}">${g.grade}</div>
+    <div><div class="t1">${g.name}</div><div class="t2"><span style="text-transform:capitalize">${CODE[g.team]||g.team} · ${g.pos}</span>${g.key?' · '+g.key:''}</div></div>
+    <div class="big" style="font-size:17px">${g.pa>0?'+':''}${g.pa.toFixed(1)}<small>pts</small></div></div>`).join('');
+  return `<h1 class="h1">Player grades</h1>
+  <p class="sub">${D.grades_match}. Points added = scoring plus what every other action adds to the margin. Grade ranks it by position across Tests: 60 average, 80+ elite.</p>
+  <details class="card vals"><summary>What each action is worth</summary><div class="values">${vals}</div></details>
+  <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===gTeam}" data-gteam="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
+  <div class="list">${rows}</div>`;
+}
+
+function method(){
+  const b=D.backtest;
+  return `<h1 class="h1">How it works</h1>
+  <div class="kpis">
+    <div class="card kpi"><b>${(b.intl_acc*100).toFixed(0)}%</b><span>Test winners called</span></div>
+    <div class="card kpi"><b>${b.intl_brier.toFixed(3)}</b><span>Brier, Tests</span></div>
+    <div class="card kpi"><b>${b.club_brier.toFixed(3)}</b><span>Brier, club</span></div>
+    <div class="card kpi"><b>${b.try_brier.toFixed(3)}</b><span>Brier, try scorer</span></div>
+    <div class="card kpi"><b>${b.sr_brier.toFixed(3)}</b><span>Brier, Super Rugby 2026</span></div>
+  </div>
+  <div class="card prose">
+    <p><b>Ratings.</b> Every team carries a rating in points that moves toward each result. Tests learn from every top-tier match since 1995.</p>
+    <p><b>Super Rugby.</b> Its own rating pool since 2022. Home advantage is small within a country and grows when the visitors cross the Tasman; the Drua get a large edge at home in Fiji.</p>
+    <p><b>Lineups.</b> Club matchday squads are rated player by player and compared with each side's usual strength.</p>
+    <p><b>Scores.</b> Attack and defence ratings project each side's points; the margin comes from the rating gap plus home advantage.</p>
+    <p><b>Try scorers.</b> Team expected tries, split by position and adjusted for each player's finishing record.</p>
+    <p><b>Testing.</b> Every number above is out of sample: each season is predicted using only the seasons before it.</p>
+  </div>`;
+}
+
+
+let BANK=1000; try{const v=localStorage.getItem('gl_bank'); if(v) BANK=+v;}catch(e){}
+const toDec = a => { const n=parseFloat(String(a).replace('−','-')); return n>0 ? 1+n/100 : 1+100/Math.abs(n); };
+const money = x => '$'+(x>=100?Math.round(x):x.toFixed(2));
+function bets(){
+  const B=D.betsTab;
+  const cards=B.bets.map(b=>{
+    const frac = b.qk*(b.tier==='Bet'?0.5:0.25);        // half or quarter of quarter-Kelly
+    const team = b.team;
+    return `<article class="card bet" style="border-left:4px solid ${tcol(team)}">
+      <div class="bet-top">${flag(team,18)}<span class="tier ${b.tier}">${b.tier}</span><span class="bet-price">${b.am}</span></div>
+      <div class="bet-name">${b.bet}</div>
+      <div class="bet-stats">
+        <div><b>+${(b.ev*100).toFixed(1)}%</b><span>EV</span></div>
+        <div><b>${b.min_am}</b><span>Worst</span></div>
+        <div><b>${(frac*100).toFixed(2)}%</b><span>Stake</span></div>
+        <div><b>${money(BANK*frac)}</b><span>Amount</span></div>
+      </div>
+      <p class="bet-why">Win chance ${pct(b.model)} model · ${pct(b.mkt)} market → ${pct(b.blend)} blended. ${b.why}</p>
+    </article>`}).join('');
+  const passes=B.passes.map(p=>`<div class="row pass"><div><div class="t1">${p.bet}</div><div class="t2" style="white-space:normal">${p.why}</div></div></div>`).join('');
+  const tries=B.tries.map(t=>{const d=toDec(t.bet_at); const f=0.05/(d-1)/8;
+    return `<div class="row tr">${flag(t.team,16)}<div><div class="t1">${t.name}</div><div class="t2">${t.team} · ${pct(t.p)} to score</div></div>
+      <div class="big" style="font-size:16px">${t.bet_at}<small>or longer</small></div><div class="big" style="font-size:15px">${money(BANK*f)}<small>${(f*100).toFixed(1)}%</small></div></div>`}).join('');
+  return `<div class="eyebrow">Private · remove before publishing</div><h1 class="h1">Bets · Round 6</h1>
+  <p class="sub">${B.rules}. Moneylines are draw-no-bet. Stakes are ⅛ Kelly (Lean: 1/16). Lines: ${B.lines}; recheck after Thursday's team sheets.</p>
+  <div class="card bank"><label for="bank">Bankroll</label><input id="bank" type="number" inputmode="decimal" min="0" step="50" value="${BANK}"></div>
+  <div class="grid">${cards}</div>
+  <div class="sec">Passes</div><div class="list">${passes}</div>
+  <div class="sec">Try scorers</div>
+  <p class="sub" style="margin-bottom:8px">Bet only at the price shown or longer. Cap all try props at 3% of bankroll combined. Wait for team sheets.</p>
+  <div class="list">${tries}</div>
+  <div class="card rules" style="margin-top:12px">Exposure: Australia −5.5 and any Australian try scorer are mostly the same bet. Size them as one position. Track every bet in the odds log so the model can be graded against the closing line.</div>`;
+}
+const VIEWS={'bets':bets,'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'method':method};
+function render(){
+  const v=(location.hash||'#projections').slice(1), view=VIEWS[v]?v:'projections';
+  document.getElementById('main').innerHTML=VIEWS[view]();
+  document.querySelectorAll('#nav a').forEach(a=>{const on=a.getAttribute('href')==='#'+view;a.setAttribute('aria-current',on?'page':'false');if(on)a.scrollIntoView({block:'nearest',inline:'center'});});
+}
+document.getElementById('main').addEventListener('change',e=>{if(e.target.id==='bank'){BANK=Math.max(0,+e.target.value||0);try{localStorage.setItem('gl_bank',BANK);}catch(_){}render();}});
+document.getElementById('main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; render();});
+window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0);});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
+new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+render();
+</script>
+</body>
+</html>

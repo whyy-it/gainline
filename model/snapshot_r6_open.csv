@@ -1,0 +1,7 @@
+date,home,away,stage,book,ml_home,ml_draw,ml_away,spread_home,spread_home_odds,spread_away_odds,total,over_odds,under_odds,model_p_home,model_margin,model_total
+2026-11-21,England,New Zealand,open,Sportingbet ZA,2.25,17.0,1.68,2.5,1.82,1.88,,,,0.6075,4.0,59.5
+2026-11-21,Scotland,Japan,open,Sportingbet ZA,1.008,51.0,23.0,-30.5,1.82,1.88,,,,0.9632,25.7,58.2
+2026-11-21,Ireland,South Africa,open,Sportingbet ZA,4.33,19.0,1.24,9.5,1.9,1.8,,,,0.3053,-7.2,52.3
+2026-11-21,Italy,Fiji,open,Sportingbet ZA,1.47,16.5,2.8,-5.5,1.9,1.8,,,,0.5342,1.4,54.2
+2026-11-21,France,Argentina,open,Sportingbet ZA,1.062,29.0,10.5,-19.5,1.88,1.82,,,,0.8966,18.2,58.8
+2026-11-21,Wales,Australia,open,Sportingbet ZA,2.85,17.5,1.44,5.5,1.83,1.87,,,,0.2343,-10.2,55.3

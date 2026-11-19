@@ -1,0 +1,7 @@
+pandas==2.3.3
+numpy
+scipy
+scikit-learn
+pyarrow
+requests
+python-dotenv

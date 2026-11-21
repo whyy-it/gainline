@@ -12,7 +12,7 @@ from datetime import date
 from scipy.stats import norm
 warnings.filterwarnings('ignore')
 import features as F
-from v6 import intl_games, elo, probit_fit, season, T1, G, CHFA
+from v6 import intl_games, elo, probit_fit, season, T1, G, CHFA, score, t1_mask
 import sr as SR
 
 OUT = '../model/site.json'
@@ -60,6 +60,27 @@ def super_rugby():
     df = SR.games(); _, R = SR.elo(df, 0.03, 1, 40, 0.2, travel_bonus=2, drua_bonus=6)
     R.pop('Rebels', None); mu = np.mean(list(R.values()))
     return sorted([dict(team=t, rating=round(float((v - mu) * 0.8), 2)) for t, v in R.items()], key=lambda x: -x['rating'])
+
+def live_backtest():
+    """The Method tab's headline numbers were hardcoded literals, never recomputed - found stale 21 Nov
+    (club/try had both drifted from the actual current model after this session's fixes: club 0.1725 vs the
+    real 0.1758 post-SA-bonus, try 0.1142 vs the real 0.11451 post-leakage-fix). Each model already has its
+    own validation harness; this just calls them and reads off the test split instead of trusting a number
+    someone typed in once."""
+    I = intl_games(True)
+    pr, _ = elo(I, 'intl', 0.08, HFA_I, 60, 0.0)
+    si = score(I, 'intl', pr, mask=t1_mask(I))
+    C = G[G.kind == 'club'].reset_index(drop=True)
+    pc, _ = elo(C, 'club', 0.06, 5, 40, 0.2, hfa_map=CHFA, sa_bonus=1.0)
+    sc = score(C, 'club', pc)
+    import tries as TR
+    tp = TR.load(); P, _, _ = TR.walk_forward(tp, test_from='2025-08-01', k=8)
+    te = P[P.date >= '2025-08-01']; q = te.p_full.clip(1e-4, 1 - 1e-4)
+    try_brier = float(np.mean((q - te.y) ** 2))
+    df = SR.games(); ps, _ = SR.elo(df, 0.03, 1, 40, 0.2, travel_bonus=2, drua_bonus=6)
+    ssr = SR.score(df, ps)
+    return dict(intl_brier=si['test'], intl_acc=si['test_acc'], club_brier=sc['test'], try_brier=round(try_brier, 4),
+                sr_brier=ssr['test'], sr_acc=ssr['test_acc'])
 
 def try_scorers(R, up):
     import tries as TR
@@ -113,13 +134,16 @@ def main():
     game_recap = RC.recap()
     standings = SP.all_standings()
     d = json.load(open(OUT))          # keep bets text (betsTab is hand-maintained, see bets.py)
+    d.pop('round', None)   # orphaned top-level field from an old desktop template (site/template.html, dead
+    # since mobile_template.html replaced it) - nothing in the current UI reads it; found 21 Nov while
+    # auditing for anything NOT actually regenerated each run.
     d.update(updated=date.today().strftime('%-d %b'), competition=COMPETITION, round_label=ROUND_LABEL,
              round_date=ROUND_DATE, market_date=MARKET_DATE, matches=matches,
              intl=[dict(team=t, rating=round(float(v), 2)) for t, v in T1L], club=club_ratings(),
              sr=super_rugby(), tries=tries, grades=graded, grades_match=grades_match,
              grade_values={k: round(float(v), 4) for k, v in grade_values.items()}, rankings=rankings,
              recap=game_recap, standings=standings)
-    d['backtest'].update(intl_brier=0.1584, intl_acc=0.767, club_brier=0.1725, try_brier=0.1142, sr_brier=0.1695, sr_acc=0.759)
+    d['backtest'].update(live_backtest())
     d['probit'] = dict(a=float(w[0]), b=float(w[1]), sigma=float(1 / w[1]))
     json.dump(d, open(OUT, 'w'), default=float)
     for m in matches:

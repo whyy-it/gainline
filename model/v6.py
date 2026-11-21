@@ -63,6 +63,7 @@ def score(df, kind, pred, mask=None, extra=None):
             X = np.c_[pred, extra.values]
             lr = LogisticRegression(max_iter=2000).fit(X[fit], y[fit] > 0.5); p = lr.predict_proba(X[sel])[:, 1]
         out[name] = round(float(np.mean((p - y[sel]) ** 2)), 4); out[name + '_n'] = int(sel.sum())
+        out[name + '_acc'] = round(float(np.mean((p > 0.5) == (y[sel] > 0.5))), 3)
     return out
 
 def t1_mask(df): return (df.home.isin(T1) & df.away.isin(T1)).values

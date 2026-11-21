@@ -515,3 +515,28 @@ rebuilds from whatever produce.py just wrote, same run, every time.
 Note: lines='Sportingbet board, 17 Nov' (the actual market odds board) stays hand-maintained in bets.py's MKT
 dict - that one's supposed to be manual (it only changes when Wyatt has a fresh market board to enter), so it
 keeps its own explicit date rather than auto-stamping. verify_site.py 23/23, verified in-browser, pushed.
+
+## Full "is everything live-wired" audit (21 Nov)
+Wyatt asked directly to confirm this before moving on. Enumerated every top-level site.json key and checked
+each one against what produce.py's main() actually sets, rather than trust it by inspection:
+- **Orphaned field found**: a top-level `round` key ('Nations Championship · Round 6') that NOTHING in the
+  current UI reads - grep found its only consumer is site/template.html, a dead desktop-era predecessor to
+  mobile_template.html that nothing in the build process touches anymore. Pure leftover cruft, silently
+  passed through every run via `d = json.load(open(OUT))`. Removed (`d.pop('round', None)`), file left in
+  place for now (not deleting without asking - it's unused but harmless sitting there).
+- **Real bug, bigger than the last one**: the Method tab's headline validation numbers
+  (intl/club/try/sr Brier + accuracy) were HARDCODED LITERALS in produce.py's d['backtest'].update() call -
+  never recomputed. Checked each against a live rerun of its own model's validation harness:
+  - club_brier: site showed 0.1725, actual current (post SA-bonus fix) is 0.1758 - STALE.
+  - try_brier: site showed 0.1142, actual current (post leakage fix) is 0.1145 - STALE.
+  - intl_brier/acc and sr_brier/acc: matched exactly (0.1584/0.767, 0.1695/0.759) - these two models
+    genuinely haven't changed this session, so the hardcoded numbers happened to still be right. Confirms
+    the live computation reproduces the original methodology correctly rather than just computing something
+    different that happens to look plausible.
+  Fixed: added live_backtest() to produce.py, reusing each model's OWN existing validation harness (v6.score()
+  for intl/club - extended it to also return accuracy, previously only Brier; tries.py's walk_forward+test
+  split; sr.py's score()) instead of re-deriving the methodology ad hoc. Runtime cost: a few seconds added to
+  produce.py's ~50s total - acceptable.
+Everything else in site.json traced to something produce.py (or bets.py, called from produce.py) actually
+sets each run. verify_site.py 23/23, confirmed in-browser (Method tab now shows 0.176/0.115 matching the live
+numbers), pushed.

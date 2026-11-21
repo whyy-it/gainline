@@ -16,15 +16,7 @@ from v6 import intl_games, elo, probit_fit, season, T1, G, CHFA
 import sr as SR
 
 OUT = '../model/site.json'
-# Round metadata - update ALL FOUR of these together each week (FIX/MKT too). They used to live hardcoded
-# separately in mobile_template.html, which is exactly how the "Thursday"/"18 Nov" copy went stale (21 Nov) -
-# one source of truth now, templated into the page instead of hand-edited there.
-COMPETITION = 'Nations Championship'
-ROUND_LABEL = 'Round 6'
-ROUND_DATE = 'Sat 21 Nov'   # match cards use this date's weekday for every game in FIX - fine while the whole
-# round is one day (true for Nations Championship), but wrong if a future round spans multiple days (e.g.
-# Six Nations' Friday/Saturday/Sunday split) - would need a per-match day added to FIX at that point.
-MARKET_DATE = '18 Nov'
+from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE, MARKET_DATE   # shared with bets.py - see that file
 FIX = [('England', 'New Zealand', 'Twickenham', '14:10 GMT'), ('Scotland', 'Japan', 'Murrayfield', '14:10 GMT'),
        ('Ireland', 'South Africa', 'Aviva Stadium', '16:40 GMT'), ('Italy', 'Fiji', 'Udine', '16:40 GMT'),
        ('France', 'Argentina', 'Stade de France', '20:10 GMT'), ('Wales', 'Australia', 'Principality Stadium', '20:10 GMT')]
@@ -133,6 +125,8 @@ def main():
     for m in matches:
         print(f"{m['home']:9s} {m['proj_home']:2d}-{m['proj_away']:2d} {m['away']:13s} p={m['p_home']:.3f}/{m['p_away']:.3f} spread {m['spread']:+.1f} total {m['total']:.1f} cover {m['p_cover_home']:.3f}")
     print('tries', len(tries), sorted(set(t['team'] for t in tries)))
+    import bets   # always rebuild betsTab from these same fresh matches/probit - a stale run order (produce.py
+    bets.build()  # changing predictions, betsTab not regenerated after) was a real gap found 21 Nov.
 
 if __name__ == '__main__':
     main()

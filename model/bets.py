@@ -9,6 +9,7 @@ Rules
 Two-way moneylines are draw-no-bet (draw = push).
 Stakes: Bet = 1/2 of quarter-Kelly on the blended probability; Lean = 1/4 of quarter-Kelly."""
 import json, numpy as np
+from datetime import date
 from scipy.stats import norm
 
 SITE = '../model/site.json'
@@ -67,7 +68,9 @@ def build():
         if best['tier'] == 'Lean': best['why'] += ' Lean only: 20+ point lines are where the model is least reliable.'
         bets.append(best)
     tries = [dict(name=t['name'], team=t['team'], p=t['p'], bet_at=t['bet_at']) for t in sorted(d['tries'], key=lambda x: -x['p'])]
-    d['betsTab'] = dict(updated='18 Nov', round='Nations Championship · Round 6 · Sat 21 Nov', lines='Sportingbet board, 17 Nov',
+    from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE
+    d['betsTab'] = dict(updated=date.today().strftime('%-d %b'), round=f'{COMPETITION} · {ROUND_LABEL} · {ROUND_DATE}',
+                        lines='Sportingbet board, 17 Nov',
                         bets=sorted(bets, key=lambda b: (b['tier'] != 'Bet', -b['ev'])), passes=passes, tries=tries,
                         rules='Blend 50/50 with market · +5% EV floor · moneylines need a 3-pt rating edge · 20+ pt lines capped at Lean')
     json.dump(d, open(SITE, 'w'), default=float)

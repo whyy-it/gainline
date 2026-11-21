@@ -495,3 +495,23 @@ Went through every remaining tab's logic, not just copy.
   changing without specific feedback that it reads as broken.
 No further logic bugs found this pass. verify_site.py 23/23 after each fix; all changes pushed to the live
 site (whyy-it.github.io/gainline).
+
+## Bets tab wasn't actually wired into the live pipeline - fixed (21 Nov)
+Wyatt asked directly: "is the bet tab wired in live?" Honest answer at the time: no. produce.py explicitly
+preserves whatever betsTab already exists ("keep bets text") and never calls bets.py - it's a separate script
+someone has to remember to run. I'd run it once this round to verify the FLAGS fix, then ran produce.py AGAIN
+afterward for the weekday fix, which is exactly the ordering that silently desyncs them (produce.py can
+change the match predictions bets.py depends on, with nothing forcing a bets.py rerun after). Caught this by
+asking "does betsTab.bets still match d['matches'] right now" - it did, but only by luck, not by guarantee.
+Also found betsTab had its OWN second hardcoded copy of the round label/date (separate from the
+produce.py-side one just fixed in round 2) and its own separate frozen 'updated' string - same bug class,
+different file.
+Fixed properly rather than patched: pulled the round metadata into round_config.py, a single module both
+produce.py and bets.py import (avoids a circular import, since produce.py now also imports bets.py to call
+it) - one source of truth for both tabs instead of two separately-drifting copies. betsTab.updated now
+auto-stamps like site.json's own 'updated' field. Most importantly: produce.py now calls bets.build() itself
+as the last step, every run, so the Bets tab can never again be generated from stale match predictions - it
+rebuilds from whatever produce.py just wrote, same run, every time.
+Note: lines='Sportingbet board, 17 Nov' (the actual market odds board) stays hand-maintained in bets.py's MKT
+dict - that one's supposed to be manual (it only changes when Wyatt has a fresh market board to enter), so it
+keeps its own explicit date rather than auto-stamping. verify_site.py 23/23, verified in-browser, pushed.

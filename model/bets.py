@@ -57,8 +57,11 @@ def build():
             if not any(p['bet'].startswith((h, a)) for p in passes):
                 passes.append(dict(bet=f'{h} v {a}', why=f'No side clears +5%. Model {sgn_line(h, round(-mg * 2) / 2)} vs market {sgn_line(h, ln)}.'))
             continue
-        if best['team'] in FLAGS or best['opp'] in FLAGS and best['team'] in FLAGS:
-            passes.append(dict(bet=f"{best['bet']} ({best['am']})", why=FLAGS[best['team']])); continue
+        if best['team'] in FLAGS or best['opp'] in FLAGS:
+            # `or ... and ...` without parens used to reduce to just `best['team'] in FLAGS` (operator
+            # precedence: `and` binds tighter, so the opp-side check was dead code) - silently let through
+            # any bet on the OTHER side of a flagged matchup, which is exactly the case this exists to catch.
+            passes.append(dict(bet=f"{best['bet']} ({best['am']})", why=FLAGS.get(best['team'], FLAGS.get(best['opp'])))); continue
         best['tier'] = 'Lean' if abs(ln) >= 20 else 'Bet'
         best['why'] = (f"Model {sgn_line(h, round(-mg * 2) / 2)} vs market {sgn_line(h, ln)}: a {abs(best['gap']):.1f}-point gap.")
         if best['tier'] == 'Lean': best['why'] += ' Lean only: 20+ point lines are where the model is least reliable.'

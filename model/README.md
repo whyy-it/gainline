@@ -467,4 +467,31 @@ User asked to fine-tune "everything" after noticing things didn't look right on 
   (0.646->0.599, still far above hand weights' -0.788) in exchange for a grading output that isn't actively
   misleading. Verified: Harry Potter (sin-binned in the Aug 29 recap) went from grade 50 (card didn't even
   make his top-3 stat list) to grade 43 with "-1 yellow card" correctly leading his key line.
-Still auditing section by section (Ratings/Rankings/Tables/Bets math next).
+## Live-site audit, round 2 (21 Nov): full pass, found one more real bug
+Went through every remaining tab's logic, not just copy.
+- **Real bug (bets.py):** `if best['team'] in FLAGS or best['opp'] in FLAGS and best['team'] in FLAGS:` -
+  `and` binds tighter than `or` with no parens, so this reduces to just `best['team'] in FLAGS`; the
+  opp-side check was dead code. Confirmed with a truth table: the only case it changes is
+  team_flagged=False/opp_flagged=True, where the current code wrongly lets the bet through - exactly the
+  scenario the flag exists to catch (a known data-quality concern about one side of a matchup should
+  suppress a bet on EITHER side of it, not just a bet on the flagged team specifically). Didn't change this
+  round's actual output (the model happened to pick the flagged team, England, as best side anyway) but was
+  a live risk for any future round. Fixed: `best['team'] in FLAGS or best['opp'] in FLAGS`, with the why-text
+  lookup fixed to match (`FLAGS.get(best['team'], FLAGS.get(best['opp']))` instead of a bare `FLAGS[best['team']]`
+  that would KeyError once the opp-side case could actually trigger).
+- Match card kickoff day was hardcoded 'Sat' regardless of D.round_date - correct by coincidence this round
+  (Nations Championship R6 is in fact all-Saturday) but would mislabel any round spanning multiple days
+  (Six Nations regularly does Fri/Sat/Sun). Now derived from round_date; still assumes one day per round -
+  flagged in produce.py for whenever that stops being true.
+- Scanned for the same `or...and` precedence class elsewhere (`grep -rn " or .* and "` across all .py) -
+  the other two hits (backtest.py, verify_site.py) already use explicit parens correctly. Isolated incident.
+- Checked try_scorers()'s `cal['coef'][2] * 0` (the 'sub' calibration term always multiplied by zero) -
+  initially looked like a bug, but it's correct: subs are already excluded from the candidate pool a few
+  lines earlier, so the sub-indicator genuinely is always 0 for every candidate reaching that line.
+- Checked the `kicks` weight (0.65/kick, looked high for a raw-volume stat) - real positive correlation with
+  margin (0.32, correct sign, weaker than metres_carried's 0.61). Not a bug, left as-is.
+- Tables tab's `+999900` fair odds for ~0% title chances - mathematically correct (matches how real
+  sportsbooks price extreme longshots) and always paired with the "0% title" context. Cosmetic at most, not
+  changing without specific feedback that it reads as broken.
+No further logic bugs found this pass. verify_site.py 23/23 after each fix; all changes pushed to the live
+site (whyy-it.github.io/gainline).

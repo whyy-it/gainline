@@ -21,7 +21,9 @@ OUT = '../model/site.json'
 # one source of truth now, templated into the page instead of hand-edited there.
 COMPETITION = 'Nations Championship'
 ROUND_LABEL = 'Round 6'
-ROUND_DATE = 'Sat 21 Nov'
+ROUND_DATE = 'Sat 21 Nov'   # match cards use this date's weekday for every game in FIX - fine while the whole
+# round is one day (true for Nations Championship), but wrong if a future round spans multiple days (e.g.
+# Six Nations' Friday/Saturday/Sunday split) - would need a per-match day added to FIX at that point.
 MARKET_DATE = '18 Nov'
 FIX = [('England', 'New Zealand', 'Twickenham', '14:10 GMT'), ('Scotland', 'Japan', 'Murrayfield', '14:10 GMT'),
        ('Ireland', 'South Africa', 'Aviva Stadium', '16:40 GMT'), ('Italy', 'Fiji', 'Udine', '16:40 GMT'),

@@ -150,7 +150,7 @@ function matchCard(m){
   const readable = c => { const [r,g,b]=rgb(c); return (0.299*r+0.587*g+0.114*b)>150 || (isDark() && (0.299*r+0.587*g+0.114*b)<60) ? 'var(--ink)' : c; };
   const tr = (t,sc,p,c,isFav)=>`<div class="trow${isFav?' fav':''}" style="--c:${readable(c)}">${flag(t,18)}<div class="nm">${t}</div><div class="sc">${sc}</div><div class="wp">${pct(p)}</div></div>`;
   return `<article class="card">
-    <div class="m-top"><span>${m.venue}</span><span>Sat ${m.ko}</span></div>
+    <div class="m-top"><span>${m.venue}</span><span>${D.round_date.split(' ')[0]} ${m.ko}</span></div>
     <div class="m-teams">${tr(m.home,m.proj_home,m.p_home,hc,hf)}${tr(m.away,m.proj_away,m.p_away,ac,!hf)}</div>
     <div class="bar" role="img" aria-label="${m.home} ${pct(m.p_home)}, draw ${pct(m.p_draw)}, ${m.away} ${pct(m.p_away)}"><i style="width:${m.p_home*100}%;background:${hc}"></i><i style="width:${m.p_draw*100}%;background:var(--draw)"></i><i style="width:${m.p_away*100}%;background:${ac}"></i></div>
     <div class="drawl"><span>Projected score · win chance</span><span>Draw ${pct(m.p_draw)}</span></div>

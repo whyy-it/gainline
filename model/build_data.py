@@ -16,6 +16,12 @@ NORM = {
     'Newcastle Red Bulls': 'Newcastle', 'Northampton Saints': 'Northampton', 'Sale': 'Sale Sharks',
     'Benetton Treviso': 'Benetton', 'Benetton Rugby': 'Benetton', 'Cardiff Blues': 'Cardiff', 'Cardiff Rugby': 'Cardiff',
     'Glasgow': 'Glasgow Warriors', 'Gwent Dragons': 'Dragons', 'Zebre Parma': 'Zebre',
+    # World Rugby Pulse API uses full official club names (found 21 Nov building wr_stats_sync.py - these
+    # excluded ~50 real Top14 matches from the sync before being added)
+    'USA Perpignan': 'Perpignan', 'RC Vannes': 'Vannes', 'Montpellier Herault Rugby Club': 'Montpellier',
+    'Section Paloise': 'Pau', 'Aviron Bayonnais': 'Bayonne', 'Lyon Olympique Universitaire': 'Lyon',
+    'RC Toulonnais': 'Toulon', 'Stade Rochelais': 'La Rochelle', 'Union Bordeaux-Begles': 'Bordeaux-Begles',
+    'ASM Clermont Auvergne': 'Clermont Auvergne', 'Edinburgh Rugby': 'Edinburgh', 'Zebre Rugby': 'Zebre',
     # nations
     'Usa': 'United States of America', 'USA': 'United States of America', 'Czechia': 'Czech Republic',
     'British Irish Lions': 'British and Irish Lions',

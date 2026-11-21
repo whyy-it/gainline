@@ -3,3 +3,4 @@
 __pycache__/
 data/rugbydata/
 odds_cache/
+model/new_*_staging.csv

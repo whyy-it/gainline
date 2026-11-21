@@ -579,3 +579,57 @@ Also found verify_site.py's "Try scorers for all 12 teams" check was hardcoded t
 as games finish, this would fail every round from here on. Fixed to derive the expected count from
 2*len(d['matches']) instead of a literal 12.
 verify_site.py 23/23, confirmed in-browser (Matches tab now shows only the 4 remaining games), pushed.
+
+## Found a live player-stats source after all: World Rugby's own Pulse API - supersedes the "no working free
+## source found" conclusion above
+Kept looking for a player-level box-score source since ESPN (empty stats arrays) and SofaScore (403 blocked)
+both failed. Found World Rugby's own API that powers worldrugby.org match centres
+(api.wr-rims-prod.pulselive.com/rugby/v3) - no key needed, reverse-engineered from the public site's own
+network calls. Far richer than anything in this repo had: 90 distinct per-player stat keys per match,
+including **minutes played** - a field the dataset never had at all, previously noted in player_rankings.py
+as "best available proxy" without it. Validated hard before trusting it: England 37-12 New Zealand
+reconstructed exactly from summed player tries/conversions; a known Harry Potter (yes, real player) yellow
+card reproduced exactly.
+Two API bugs found and worked around (`model/wr_stats_sync.py`):
+- The `/match` endpoint's own `competition` filter param doesn't filter - passing ANY value (even a correct
+  one) silently narrows results to an unrelated/incomplete subset rather than erroring (588 matches for a
+  2.5-month window WITH a dummy competition id vs 1300+ WITHOUT one, and the "with" version was missing
+  Prem/URC entirely). Fixed by omitting the param and pulling the full date range, filtering client-side by
+  team name against games.parquet's known universe - same bug class and same fix pattern as ESPN's broken
+  competition filter in club_fixtures.py.
+- Competition labels don't match current sponsor branding: "URC" not "United Rugby Championship", "English
+  Premiership" not "Gallagher Premiership", "EPCR Champions Cup" not "Heineken Champions Cup" this season -
+  found by printing the actual returned labels rather than guessing, mapped in COMP_MAP.
+- World Rugby uses full official club names ("Union Bordeaux-Begles", "ASM Clermont Auvergne", "RC
+  Toulonnais", etc.) that didn't match this repo's short-form convention - added 12 missing aliases to
+  build_data.py's NORM dict after finding them all via an EXCLUDED-pairs printout.
+- Replacement players only carry a generic "Replacement" position label (no forward/back distinction) -
+  `wr_position()` derives it from jersey number (16-20 forward_sub, 21-23 back_sub, standard squad numbering).
+  Coaching staff erroneously appear in the playerStats array with null stats - filtered out (number is None).
+
+**Data-quality check, not a bug**: summing player-level points to reconstruct team score matched exactly in
+303 of 320 team-sides checked; the other 17 were short by EXACTLY 7.0, never any other amount
+(collections.Counter confirmed only {0.0: 303, 7.0: 17}). Diagnosed as penalty tries - rugby law assigns no
+individual scorer to one, so no player's stat line captures it. Corrected for in team_match_stats.parquet's
+`tries` column specifically (it feeds the four-try/three-try-differential bonus-point rules in
+league_sim.py/top14_sim.py) by adding +1 whenever the gap is exactly 7; left player_stats.parquet's
+individual rows alone since each one is correct as-is.
+
+`team_match_stats.parquet` had NO build script anywhere in this repo before this (confirmed via
+`grep -rln "team_match_stats\|match_meta" *.py` - every script only read it, never wrote it; a frozen
+delivery like several other files found this session). `wr_stats_merge.py` is the first real implementation
+of that aggregation.
+
+**Merge bug caught before it shipped**: the first version of wr_stats_merge.py aligned the new batch to the
+OLD parquet's column set (`P_new = P_new[P_old.columns]`), which silently dropped `minutes` - the one field
+this whole integration exists to add, since it was never in the schema before. Caught by checking
+`'minutes' in P.columns` after the first run came back True on row counts but the column wasn't there. Fixed
+to union columns both directions (new fields survive with NaN backfill on old rows, not dropped).
+
+Ran 21 Nov 2026 for 2026-09-07 to 2026-11-21: 160 matches, 7357 player-rows, across European Rugby Challenge
+Cup (9), European Rugby Champions Cup (12), French Top 14 (56), Gallagher Premiership (25), Nations
+Championship (18), United Rugby Championship (40). player_stats.parquet 239517 -> 246874 rows,
+team_match_stats.parquet 9877 -> 10197 rows. Player-data cutoff moves from Sep 2026 to 21 Nov 2026.
+Not yet wired into player_rankings.py's rate stats (minutes is available now but nothing uses it as a
+denominator yet) or scheduled to run automatically - both still open. verify_site.py 23/23 after rerunning
+produce.py/build_site.py on the merged data.

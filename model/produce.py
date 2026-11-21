@@ -47,7 +47,7 @@ def tests():
 
 def club_ratings():
     C = G[G.kind == 'club'].reset_index(drop=True)
-    _, R = elo(C, 'club', 0.06, 5, 40, 0.2, hfa_map=CHFA)
+    _, R = elo(C, 'club', 0.06, 5, 40, 0.2, hfa_map=CHFA, sa_bonus=1.0)
     LG = {}
     for comp, lg in (('French Top 14', 'Top 14'), ('Gallagher Premiership', 'Prem'), ('United Rugby Championship', 'URC')):
         cur = C[(C.competition == comp) & (C.date >= '2026-08-01')]
@@ -102,9 +102,19 @@ def main():
                             mkt_spread=ln, mdh=o1, mda=o2, p_cover_home=1 - norm.cdf(-ln, mg, sig)))
     T1L = sorted([(t, R[t]) for t in T1], key=lambda x: -x[1])
     tries, _ = try_scorers(R, up)
-    d = json.load(open(OUT))          # keep grades / grade values / bets text
+    import grades_produce as GP
+    import player_rankings as PR
+    import recap_report as RC
+    import standings_produce as SP
+    graded, grades_match, grade_values = GP.player_grades()
+    rankings = PR.site_rankings()
+    game_recap = RC.recap()
+    standings = SP.all_standings()
+    d = json.load(open(OUT))          # keep bets text (betsTab is hand-maintained, see bets.py)
     d.update(matches=matches, intl=[dict(team=t, rating=round(float(v), 2)) for t, v in T1L], club=club_ratings(),
-             sr=super_rugby(), tries=tries)
+             sr=super_rugby(), tries=tries, grades=graded, grades_match=grades_match,
+             grade_values={k: round(float(v), 4) for k, v in grade_values.items()}, rankings=rankings,
+             recap=game_recap, standings=standings)
     d['backtest'].update(intl_brier=0.1584, intl_acc=0.767, club_brier=0.1725, try_brier=0.1142, sr_brier=0.1695, sr_acc=0.759)
     d['probit'] = dict(a=float(w[0]), b=float(w[1]), sigma=float(1 / w[1]))
     json.dump(d, open(OUT, 'w'), default=float)

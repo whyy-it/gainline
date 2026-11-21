@@ -1,0 +1,4 @@
+angle,n,resid_sd,pool_sd,p_two_sided,survives_bonferroni
+Derby games (tighter or wilder than Elo expects),56,17.61470427120694,16.038945073551997,0.3905,False
+Club: during an intl window (Nov/Feb/Mar),503,14.728696617642026,16.038945073551997,0.033,False
+Euro cup round within 10 days of an intl window,154,15.31834978990059,16.038945073551997,0.545,False

@@ -1,6 +1,7 @@
 """Situational angle scan. Each angle picks a SIDE in a game; we measure that side vs the pre-match Elo line.
 resid = side's actual margin - Elo-expected margin. cover = side beats the Elo line (proxy for ATS; no odds history).
 Breakeven at -110 is 52.4%."""
+import warnings; warnings.filterwarnings('ignore')
 import numpy as np, pandas as pd
 from scipy.stats import norm
 
@@ -10,6 +11,16 @@ T1 = {'England','France','Ireland','Italy','Scotland','Wales','New Zealand','Aus
 SA = {'Bulls', 'Lions', 'Sharks', 'Stormers'}
 FR = {'Toulouse','Bordeaux-Begles','La Rochelle','Racing 92','Stade Francais','Toulon','Clermont Auvergne','Montpellier','Pau',
       'Castres','Bayonne','Lyon','Perpignan','Vannes','US Montauban','Brive','Oyonnax'}
+# Well-established derbies only, within the 3 leagues this site tracks - not an exhaustive rivalry list,
+# just the handful that are unambiguous (avoids a shaky/arbitrary long list).
+DERBIES = [frozenset(p) for p in [
+    ('Racing 92', 'Stade Francais'),            # Le Classique Parisien
+    ('Bath', 'Bristol Bears'),                  # West Country derby
+    ('Leicester Tigers', 'Northampton'),         # East Midlands derby
+    ('Leinster', 'Munster'),                    # Ireland's biggest derby
+    ('Ospreys', 'Scarlets'),                    # Welsh regional derby
+    ('Bulls', 'Lions'),                         # South African (Pretoria-Johannesburg) derby
+]]
 
 def team_log(S):
     """long table: one row per team-game with pre-match info and that game's result vs Elo."""
@@ -26,6 +37,23 @@ def team_log(S):
     L['prev_date'] = g.date.shift(1); L['rest'] = (L.date - L.prev_date).dt.days
     L['prev_comp'] = g.comp.shift(1)
     return L
+
+def summarize_var(name, x, pool, n_perm=4000):
+    """For MATCH-LEVEL flags that don't distinguish home/away (derby, playing during an intl window, etc.):
+    summarize()'s mean resid and cover are mathematically forced to ~0 and 0.5 for these, since every match
+    contributes a home row and an away row with resid_home = -resid_away exactly - no real effect, however
+    large, can show up in a signed mean. (Found while adding new angles - it silently neutered the existing
+    "Club: playing during intl window" result.) Variance doesn't cancel this way: test whether |resid| runs
+    higher (more chaotic/upset-prone) or lower (tighter, more predictable) than a same-size random sample of
+    the pool it's drawn from - a permutation test, so it reports a real p-value comparable to the others.
+    pool: the resid array of the broader population (e.g. all club games) this flag is a subset of."""
+    x = x.dropna(subset=['resid'])
+    if len(x) < 25: return None
+    v = (x.resid ** 2).mean()
+    rng = np.random.default_rng(0)
+    perm = np.array([(rng.choice(pool, len(x)) ** 2).mean() for _ in range(n_perm)])
+    p = 2 * min(np.mean(perm >= v), np.mean(perm <= v))
+    return dict(angle=name, n=len(x), resid_sd=v ** 0.5, pool_sd=(pool ** 2).mean() ** 0.5, p_two_sided=min(p, 1.0))
 
 def summarize(name, x, sig=16.6):
     x = x.dropna(subset=['resid'])
@@ -57,7 +85,6 @@ def run():
     A.append(summarize('URC: away dog of 10+', C[(C.comp == 'United Rugby Championship') & (C.side == 'away') & (C.exp <= -10)]))
     A.append(summarize('Euro cups: French team away', C[C.comp.str.contains('European') & C.team.isin(FR) & (C.side == 'away')]))
     A.append(summarize('Euro cups: French team home', C[C.comp.str.contains('European') & C.team.isin(FR) & (C.side == 'home')]))
-    A.append(summarize('Club: playing during intl window', C[C.date.apply(big_nov) & (C.comp.isin(['French Top 14','Gallagher Premiership','United Rugby Championship']))]))
     A.append(summarize('Club: first game after Europe (league)', C[C.prev_comp.fillna('').str.contains('European') & ~C.comp.str.contains('European')]))
     # ---- internationals (tier-1 v tier-1)
     SH = {'New Zealand','Australia','South Africa','Argentina','Fiji'}
@@ -71,6 +98,46 @@ def run():
     A.append(summarize('Intl: big fav (10+)', I[I.exp >= 10]))
     return pd.DataFrame([a for a in A if a]).sort_values('t', ascending=False)
 
+def run_var():
+    """Match-level (symmetric, non-side-specific) angles - tested on variance, not mean, per summarize_var's
+    docstring. One row per match (home side only) so each match counts once, not twice."""
+    C = team_log(SC[SC.date >= '2022-08-01'])
+    C = C[C.side == 'home'].copy()   # one row per match now; home/away no longer meaningful for these flags
+    big_nov = lambda d: d.month == 11 or (d.month in (2, 3))
+    pool = C.resid.dropna().values
+    is_derby = [frozenset((h, a)) in DERBIES for h, a in zip(C.team, C.opp)]
+    CLUBLGS = ['French Top 14', 'Gallagher Premiership', 'United Rugby Championship']
+    V = []
+    V.append(summarize_var('Derby games (tighter or wilder than Elo expects)', C[pd.Series(is_derby, index=C.index)], pool))
+    V.append(summarize_var('Club: during an intl window (Nov/Feb/Mar)', C[C.date.apply(big_nov) & C.comp.isin(CLUBLGS)], pool))
+    V.append(summarize_var('Euro cup round within 10 days of an intl window', C[C.comp.str.contains('European', na=False) &
+             C.date.apply(lambda d: big_nov(d) or big_nov(d + pd.Timedelta(days=10)) or big_nov(d - pd.Timedelta(days=10)))], pool))
+    return pd.DataFrame([v for v in V if v])
+
 if __name__ == '__main__':
     pd.set_option('display.width', 220)
-    R = run(); print(R.round(3).to_string(index=False)); R.to_csv('../model/angles.csv', index=False)
+    R = run()
+    Rv = run_var()
+    # multiple-testing correction (CLAUDE.md hard rule): Bonferroni across EVERY angle tried this scan,
+    # mean-based and variance-based together (they're all draws from the same "how many things did we try" tally)
+    n_angles = len(R) + len(Rv)
+    alpha = 0.05 / n_angles
+    from scipy.stats import t as tdist
+    R['p_two_sided'] = 2 * (1 - tdist.cdf(R.t.abs(), R.n - 1))
+    R['survives_bonferroni'] = R.p_two_sided < alpha
+    Rv['survives_bonferroni'] = Rv.p_two_sided < alpha
+    print(R.round(4).to_string(index=False))
+    print(f'\n--- match-level angles (variance test - see summarize_var docstring for why) ---')
+    print(Rv.round(4).to_string(index=False))
+    survivors = R.survives_bonferroni.sum() + Rv.survives_bonferroni.sum()
+    print(f'\n{n_angles} angles tested -> Bonferroni alpha {alpha:.4f}. Survive: {survivors} of {n_angles}.')
+    if R.survives_bonferroni.any():
+        print(R[R.survives_bonferroni][['angle', 'n', 'resid', 't', 'p_two_sided']].to_string(index=False))
+    if Rv.survives_bonferroni.any():
+        print(Rv[Rv.survives_bonferroni][['angle', 'n', 'resid_sd', 'pool_sd', 'p_two_sided']].to_string(index=False))
+    print('\nCAVEAT: resid/t (and resid_sd) are vs our OWN Elo expectation, not the market closing line (no broad '
+          'odds history exists for clubs/internationals - see model/README.md). A surviving angle is a candidate '
+          'for the model or for the forward bets rule, not a proven market edge; it still needs validating against '
+          'real closing lines as odds_log.csv accumulates rounds, or against the paid odds dataset if purchased.')
+    R.to_csv('../model/angles.csv', index=False)
+    Rv.to_csv('../model/angles_var.csv', index=False)

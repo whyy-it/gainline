@@ -90,14 +90,19 @@ def scores(te):
 if __name__ == '__main__':
     pd.set_option('display.width', 200)
     p = load(); print('rows', len(p), 'try rate', p.tries.gt(0).mean().round(3))
+    # pick k on a VAL slice (2024-08-01 to 2025-08-01), trained only on data before it - test (2025-08-01+) never touched
+    VAL_FROM, TEST_FROM = '2024-08-01', '2025-08-01'
     best = None
     for k in [2, 4, 8, 16]:
-        P_, mt, share = walk_forward(p, k=k)
-        te = P_[P_.date >= '2025-08-01']; s = scores(te)
-        print('k', k, s.loc['p_full'].round(5).to_dict())
-        if best is None or s.loc['p_full', 'logloss'] < best[1].loc['p_full', 'logloss']: best = (k, s, P_)
-    k, s, P_ = best; te = P_[P_.date >= '2025-08-01']
-    print('\nbest k', k, ' test rows', len(te)); print(s.round(5))
+        P_val, _, _ = walk_forward(p, test_from=VAL_FROM, k=k)
+        va = P_val[(P_val.date >= VAL_FROM) & (P_val.date < TEST_FROM)]; s = scores(va)
+        print('k', k, 'val', s.loc['p_full'].round(5).to_dict())
+        if best is None or s.loc['p_full', 'logloss'] < best[1]: best = (k, s.loc['p_full', 'logloss'])
+    k = best[0]
+    print(f'\nchosen on val only: k={k}')
+    P_, mt, share = walk_forward(p, test_from=TEST_FROM, k=k)
+    te = P_[P_.date >= TEST_FROM]; s = scores(te)
+    print('\nTEST (2025-26+), never used to pick k - test rows', len(te)); print(s.round(5))
     print('\nteam-tries GLM coef (margin, intl):', mt.coef_.round(4), 'intercept', round(mt.intercept_, 3))
     print('\nposition share multiplier:'); print(share.round(3).sort_values(ascending=False))
     te = te.assign(b=pd.cut(te.p_full, [0, .05, .1, .15, .2, .3, .4, .6, 1]))

@@ -9,6 +9,7 @@ T1 = {'England','France','Ireland','Italy','Scotland','Wales','New Zealand','Aus
 KEY = {'French Top 14':'top14','Gallagher Premiership':'prem','United Rugby Championship':'urc',
        'European Rugby Champions Cup':'euro','European Rugby Challenge Cup':'euro'}
 CHFA = dict(top14=9, prem=7, urc=6, euro=6)
+SA_CLUBS = {'Bulls', 'Lions', 'Sharks', 'Stormers'}
 
 def season(d, kind): return d.year if kind == 'intl' else (d.year if d.month >= 8 else d.year - 1)
 
@@ -23,8 +24,10 @@ def intl_games(long_history=False):
     I = I[~((I.date < '2022-06-01') & I.home.isin(T1) & I.away.isin(T1))]
     return pd.concat([k, I], ignore_index=True).sort_values('date').reset_index(drop=True)
 
-def elo(df, kind, K, hfa, cap, regress, weight=None, target=None, hfa_map=None):
-    """weight: per-row multiplier on K. target: per-row margin to learn from (default actual margin)."""
+def elo(df, kind, K, hfa, cap, regress, weight=None, target=None, hfa_map=None, sa_bonus=0.0):
+    """weight: per-row multiplier on K. target: per-row margin to learn from (default actual margin).
+    sa_bonus: extra home-side edge when exactly one of home/away is an SA club (crossing into/out of SA
+    altitude+travel), added on top of hfa_map - mirrors sr.py's travel_bonus for Super Rugby border crossings."""
     R = {}; preds = np.zeros(len(df)); last = None
     W = np.ones(len(df)) if weight is None else np.asarray(weight, float)
     TG = (df.hs - df.as_).values if target is None else np.asarray(target, float)
@@ -35,6 +38,8 @@ def elo(df, kind, K, hfa, cap, regress, weight=None, target=None, hfa_map=None):
             R = {t: mu + (v - mu) * (1 - regress) for t, v in R.items()}
         last = s
         H = 0.0 if r.neutral else (hfa_map[KEY[r.competition]] if hfa_map else hfa)
+        if not r.neutral and sa_bonus and ((r.home in SA_CLUBS) != (r.away in SA_CLUBS)):
+            H += sa_bonus
         p = R.get(r.home, 0) - R.get(r.away, 0) + H; preds[j] = p
         e = np.clip(TG[j], -cap, cap) - p
         R[r.home] = R.get(r.home, 0) + K * W[j] * e; R[r.away] = R.get(r.away, 0) - K * W[j] * e

@@ -1,0 +1,21 @@
+﻿Type;Country;League;Season;Date;Stage;Status;Home;ScoreH;ScoreA;Away;Cote1;CoteX;Cote2;End_of_RT;Total points;Winning_Margin
+Rugby League;Australia;NRL;2009;24/08/2009;Regular season;Finished;Canterbury Bulldogs;28;4;Sydney Roosters;1.11;29.43;6.0;Home;32;At_Least_15
+Rugby League;Australia;NRL;2009;28/08/2009;Regular season;Finished;NQ Cowboys;10;16;Brisbane Broncos;2.77;21.67;1.44;Away;26;1_to_7
+Rugby League;Australia;State of Origin;2019;05/06/2019;Regular season;Finished;Queensland;18;14;New South Wales;1.96;16.0;1.9;Home;32;1_to_7
+Rugby League;England;Super League;2009;28/02/2009;Regular season;Finished;Castleford;52;16;Salford;2.04;22.0;2.48;Home;68;At_Least_15
+Rugby League;England;Super League;2009;06/03/2009;Regular season;Finished;Huddersfield;20;24;Hull FC;1.62;19.67;2.25;Away;44;1_to_7
+Rugby League;World;World Cup;2008;10/11/2008;Play Offs;Finished;Ireland;14;30;Fiji;2.94;22.67;1.37;Away;44;At_Least_15
+Rugby Union;England;Championship Rugby;2014/2015;05/09/2014;Regular season;Finished;Nottingham;19;10;Bedford Blues;1.53;21.0;2.62;Home;29;8_to_14
+Rugby Union;England;Premiership Rugby;2008/2009;29/11/2008;Regular season;Finished;Gloucester;33;10;Northampton Saints;1.17;26.0;4.52;Home;43;At_Least_15
+Rugby Union;England;Premiership Rugby;2008/2009;30/11/2008;Regular season;Finished;Bristol;13;18;London Irish;2.59;19.0;1.5;Away;31;1_to_7
+Rugby Union;Europe;Challenge Cup;2010/2011;09/12/2010;Regular season;Finished;Montpellier;39;14;CS Bourgoin-Jallieu;1.04;32.5;9.06;Home;53;At_Least_15
+Rugby Union;Europe;European Rugby Champions Cup;2008/2009;13/12/2008;Regular season;Finished;Montauban;16;12;Sale Sharks;3.77;24.33;1.25;Home;28;1_to_7
+Rugby Union;Europe;European Rugby Champions Cup;2008/2009;14/12/2008;Regular season;Finished;USA Perpignan;26;20;Leicester Tigers;1.58;19.0;2.4;Home;46;1_to_7
+Rugby Union;Europe;Six Nations;2009;07/02/2009;Regular season;Finished;Ireland;30;21;France;1.69;21.0;2.28;Home;51;8_to_14
+Rugby Union;France;Pro D2;2012/2013;05/05/2013;Regular season;Finished;Section Paloise;73;27;US Oyonnax;1.35;19.0;3.25;Home;100;At_Least_15
+Rugby Union;France;Top 14;2008/2009;01/11/2008;Regular season;Finished;Biarritz Olympique;12;14;Aviron Bayonnais;1.13;25.33;5.05;Away;26;1_to_7
+Rugby Union;New Zealand;Bunnings NPC;2011;17/07/2011;Regular season;Finished;Counties Manukau;13;20;Bay of Plenty;2.57;19.0;1.52;Away;33;1_to_7
+Rugby Union;South Africa;Currie Cup;2010;16/07/2010;Regular season;Finished;Cheetahs;33;26;Griquas;1.32;21.5;3.35;Home;59;1_to_7
+Rugby Union;World;Rugby Championship;2011;23/07/2011;Regular season;Finished;Australia;39;20;South Africa;1.28;22.63;3.64;Home;59;At_Least_15
+Rugby Union;World;Super Rugby;2010;12/02/2010;Regular season;Finished;Cheetahs;34;51;Bulls;3.72;23.48;1.26;Away;85;At_Least_15
+Rugby Union;World;United Rugby Championship;2008/2009;30/04/2009;Regular season;Finished;Ospreys;27;18;Dragons;1.09;31.0;7.17;Home;45;8_to_14

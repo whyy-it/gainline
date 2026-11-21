@@ -12,12 +12,14 @@ import numpy as np, pandas as pd, json
 from model import G
 
 SA_CLUBS = {'Bulls', 'Lions', 'Sharks', 'Stormers', 'Cheetahs', 'Pumas'}
+SA_URC_CLUBS = {'Bulls', 'Lions', 'Sharks', 'Stormers'}   # the 4 validated in v6.py's sa_bonus (README, 18 Nov) -
+# narrower than SA_CLUBS above (which also covers Cheetahs/Pumas for the unrelated 'travel' feature)
 SH_NATIONS = {'New Zealand', 'Australia', 'South Africa', 'Argentina', 'Fiji', 'Samoa', 'Tonga', 'Uruguay', 'Chile',
               'Brazil', 'Paraguay', 'Namibia', 'Zimbabwe', 'Kenya'}
 NH_HOSTS = {'England', 'France', 'Ireland', 'Italy', 'Scotland', 'Wales', 'Georgia', 'Portugal', 'Spain', 'Romania',
             'Japan', 'United States of America', 'Canada'}
 
-def build_state(df, kind, K, hfa_fn, cap, regress, Ka=0.05):
+def build_state(df, kind, K, hfa_fn, cap, regress, Ka=0.05, sa_bonus=0.0):
     R, ATT, DEF = {}, {}, {}
     last, resid_hist, hres = {}, {}, {}
     mu_pts = df[['hs', 'as_']].values.mean()
@@ -34,6 +36,7 @@ def build_state(df, kind, K, hfa_fn, cap, regress, Ka=0.05):
         last_season = season
         h, a = r.home, r.away
         H = 0.0 if r.neutral else hfa_fn(r)
+        if not r.neutral and sa_bonus and ((h in SA_URC_CLUBS) != (a in SA_URC_CLUBS)): H += sa_bonus
         rh, ra = R.get(h, 0.), R.get(a, 0.)
         pred = rh - ra + H
         # attack/defence expected points (log-ish additive)
@@ -71,5 +74,5 @@ KEY = {'French Top 14': 'top14', 'Gallagher Premiership': 'prem', 'United Rugby 
 
 def intl_state():
     return build_state(G[G.kind == 'intl'], 'intl', IK, lambda r: IH, ICAP, IREG)
-def club_state():
-    return build_state(G[G.kind == 'club'], 'club', 0.06, lambda r: CHFA[KEY[r.competition]], 40, 0.2)
+def club_state(sa_bonus=1.0):
+    return build_state(G[G.kind == 'club'], 'club', 0.06, lambda r: CHFA[KEY[r.competition]], 40, 0.2, sa_bonus=sa_bonus)

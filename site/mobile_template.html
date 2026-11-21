@@ -129,7 +129,7 @@ main{padding:16px 0 calc(28px + env(safe-area-inset-bottom))}
   <div class="wrap">
     <div class="mast"><div class="logo">Gain<span>line</span></div><div class="upd" id="upd"></div></div>
     <nav id="nav" aria-label="Sections">
-      <a href="#projections">Matches</a><a href="#try-scorers">Tries</a><a href="#ratings">Ratings</a><a href="#player-grades">Grades</a><a href="#bets">Bets</a><a href="#method">Method</a>
+      <a href="#projections">Matches</a><a href="#try-scorers">Tries</a><a href="#ratings">Ratings</a><a href="#player-grades">Grades</a><a href="#rankings">Rankings</a><a href="#tables">Tables</a><a href="#bets">Bets</a><a href="#method">Method</a>
     </nav>
   </div>
 </header>
@@ -209,11 +209,54 @@ function grades(){
   const rows=D.grades.filter(g=>gTeam==='All'||g.team===gTeam).map(g=>`<div class="row gd"><div class="grade" style="background:${gcol(g.grade)}">${g.grade}</div>
     <div><div class="t1">${g.name}</div><div class="t2"><span style="text-transform:capitalize">${CODE[g.team]||g.team} · ${g.pos}</span>${g.key?' · '+g.key:''}</div></div>
     <div class="big" style="font-size:17px">${g.pa>0?'+':''}${g.pa.toFixed(1)}<small>pts</small></div></div>`).join('');
+  const rc=D.recap, hl=rc?.highlights?.map(h=>`<p style="margin:0 0 6px">${h}</p>`).join('')||'';
   return `<h1 class="h1">Player grades</h1>
   <p class="sub">${D.grades_match}. Points added = scoring plus what every other action adds to the margin. Grade ranks it by position across Tests: 60 average, 80+ elite.</p>
+  ${rc?`<div class="card prose" style="margin-bottom:12px">${hl}</div>`:''}
   <details class="card vals"><summary>What each action is worth</summary><div class="values">${vals}</div></details>
   <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===gTeam}" data-gteam="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
   <div class="list">${rows}</div>`;
+}
+
+let rkLg='Country', rkWin='current';
+function rankings(){
+  const cats=Object.keys(D.rankings.current);
+  const list=[...D.rankings[rkWin][rkLg]].sort((a,b)=>b.grade-a.grade);
+  const isCountry=rkLg==='Country';
+  const rows=list.map((r,i)=>`<div class="row gd"><div class="grade" style="background:${gcol(r.grade)}">${r.grade}</div>
+    <div><div class="t1">${i+1}. ${r.name}</div><div class="t2">${isCountry?flag(r.team,11):badge(r.team,14)} <span style="text-transform:capitalize">${r.team} · ${r.pos}</span> · ${r.n} games</div></div>
+    <div class="big" style="font-size:17px">${r.rate>0?'+':''}${r.rate.toFixed(1)}<small>pts/gm</small></div></div>`).join('');
+  return `<h1 class="h1">Player rankings</h1>
+  <p class="sub">Shrunk points added per game, ranked within position (and within league for clubs - a Top 14 prop isn't judged against a Premiership prop).</p>
+  <div class="filters" role="group" aria-label="Window">
+    <button type="button" aria-pressed="${rkWin==='current'}" data-rkwin="current">Current form</button>
+    <button type="button" aria-pressed="${rkWin==='alltime'}" data-rkwin="alltime">All-time (since 2022)</button>
+  </div>
+  <div class="filters" role="group" aria-label="Competition">${cats.map(c=>`<button type="button" aria-pressed="${c===rkLg}" data-rklg="${c}">${c}</button>`).join('')}</div>
+  <div class="list">${rows}</div>
+  <p class="note">${rkWin==='current'?'Last 365 days of data, min 5 games.':'Every game since the data starts (2022), min 15 games - not truly all-time, just as far back as the data goes.'} ${isCountry?'Tier-1 nations only, pooled across all Tests.':'One league at a time: a prop’s rate isn’t compared across leagues of different strength.'}</p>`;
+}
+
+let tblComp='Nations Championship';
+const INTL_COMPS_UI = new Set(['Nations Championship','Six Nations']);
+function tables(){
+  const comps=Object.keys(D.standings);
+  const c=D.standings[tblComp];
+  const isIntl=INTL_COMPS_UI.has(tblComp);
+  const rows=c.teams.map((r,i)=>{
+    const sub = r.played>0 ? `${r.pts} pts · ${r.played} played` : 'season not yet started';
+    const qual = c.has_qualify ? `<div class="meter" aria-hidden="true"><i style="width:${Math.round(r.p_qualify*100)}%;background:${tcol(r.team)}"></i></div>` : '';
+    return `<div class="row rk" style="grid-template-columns:18px ${c.has_qualify?'24px minmax(0,1fr) 54px 70px':'24px minmax(0,1fr) 70px'}">
+      <div class="n">${i+1}</div>${isIntl?flag(r.team,16):badge(r.team,22)}
+      <div><div class="t1">${r.team}</div><div class="t2">${sub}</div></div>
+      ${qual}
+      <div class="big" style="font-size:16px">${r.fair_odds}<small>${pct(r.p_champion)} title</small></div></div>`;
+  }).join('');
+  return `<h1 class="h1">Predicted tables &amp; title odds</h1>
+  <p class="sub">Monte Carlo simulation (5,000+ seasons) from Gainline's own ratings, not a market price - see Method for what's actually validated. ${c.note}</p>
+  <div class="filters" role="group" aria-label="Competition">${comps.map(k=>`<button type="button" aria-pressed="${k===tblComp}" data-tbl="${k}">${k}</button>`).join('')}</div>
+  <div class="list">${rows}</div>
+  <p class="note">Fair odds are Gainline's own estimate of what a bet on the title should pay if priced with no margin - not a real market line (no sportsbook offers futures odds for any of these competitions right now).${c.has_qualify?' Bar shows chance of making the playoffs.':''}</p>`;
 }
 
 function method(){
@@ -270,7 +313,7 @@ function bets(){
   <div class="list">${tries}</div>
   <div class="card rules" style="margin-top:12px">Exposure: Australia −5.5 and any Australian try scorer are mostly the same bet. Size them as one position. Track every bet in the odds log so the model can be graded against the closing line.</div>`;
 }
-const VIEWS={'bets':bets,'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'method':method};
+const VIEWS={'bets':bets,'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'rankings':rankings,'tables':tables,'method':method};
 function render(){
   const v=(location.hash||'#projections').slice(1), view=VIEWS[v]?v:'projections';
   document.getElementById('main').innerHTML=VIEWS[view]();
@@ -278,7 +321,7 @@ function render(){
 }
 document.getElementById('main').addEventListener('change',e=>{if(e.target.id==='bank'){BANK=Math.max(0,+e.target.value||0);try{localStorage.setItem('gl_bank',BANK);}catch(_){}render();}});
 document.getElementById('main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; render();});
+  if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; if(b.dataset.rklg)rkLg=b.dataset.rklg; if(b.dataset.rkwin)rkWin=b.dataset.rkwin; if(b.dataset.tbl)tblComp=b.dataset.tbl; render();});
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0);});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
 new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});

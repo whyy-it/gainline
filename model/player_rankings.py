@@ -1,0 +1,100 @@
+"""Club & country player rankings. Builds on grades_produce.py's validated data-driven weights (R2=0.65
+single-match, vs hand weights' -0.79 - see README) but aggregates across games instead of one match.
+No minutes-played field exists in player_stats.parquet, so "current form" = shrunk mean points-added per
+game over the last 365 days of available data (capped ~2026-09-06, the same data-cutoff noted in README/
+CLAUDE.md), empirical-Bayes shrunk toward the position group's mean with k pseudo-games - same recipe
+tries.py and lineup_value.py already use elsewhere in this repo, for consistency.
+Club and country are scored SEPARATELY: a player's club form and Test form can differ, and the eligible
+player pool differs a lot (every league vs only capped internationals), so z-scoring them together would
+be apples-to-oranges."""
+import re
+import numpy as np, pandas as pd
+from tries import GROUP
+from grades import team_diffs, learn_values, FEATS
+from v6 import T1
+
+INTL_COMPS = {'International Test Match', 'The Rugby Championship', 'Six Nations', 'Rugby World Cup',
+              'Autumn Nations Series', 'Autumn Nations Cup', 'Nations Championship'}
+EXCLUDE_COMP = re.compile(r"women|u[\s-]?20", re.I)   # different talent pools - not comparable to senior men's
+MIN_GAMES = 5
+K_SHRINK = 6  # pseudo-games toward the position-group mean
+
+def load_graded():
+    p = pd.read_parquet('player_stats.parquet')
+    tm = pd.read_parquet('team_match_stats.parquet'); tm = tm[tm.ok]
+    p = p[p.set_index(['match_id', 'team']).index.isin(tm.set_index(['match_id', 'team']).index)].copy()
+    for f in FEATS + ['points']: p[f] = p[f].fillna(0)
+    p['grp'] = p.position.map(GROUP)
+    p = p[p.grp.notna()]
+    comp = p.competition.fillna(p.set_index(['match_id', 'team']).index.map(
+        tm.set_index(['match_id', 'team']).comp).to_series(index=p.index))
+    p = p[~comp.fillna('').str.contains(EXCLUDE_COMP)]   # drop women's/U20 - different talent pool, not comparable
+    comp = comp[p.index]
+    p['league'] = comp
+    p['bucket'] = np.where(comp.isin(INTL_COMPS), 'country', 'club')
+    p = p[(p.bucket == 'club') | p.team.isin(T1)]   # country bucket: tier-1 nations only, same convention as v6.py
+    _, m, X = team_diffs()
+    vals, r2 = learn_values(m, X, train_end=str(p.date.max() + pd.Timedelta(days=1)))  # fit on ALL history - this is a
+    # retrospective valuation (what's an action worth), not a forecast, so no walk-forward need here; R2 already
+    # validated out-of-sample in grades_produce.py's fit_report.
+    p['pa'] = sum(p[f] * v for f, v in vals.items()) + 0.5 * p.points
+    return p, vals
+
+def rank(p, bucket, days=365, min_games=MIN_GAMES):
+    """club: z-scored within (league, position) - a Top14 prop isn't comparable to a Japan League One prop
+    by raw rate, different competitive pools. country: z-scored within position only (already T1-only, one pool).
+    days=None -> all available history (since 2022-01-01, the data's start - there's no deeper "all-time")."""
+    x = p[p.bucket == bucket].copy()
+    key = ['league', 'grp'] if bucket == 'club' else ['grp']
+    recent = x if days is None else x[x.date >= x.date.max() - pd.Timedelta(days=days)]
+    g = recent.groupby(['player_id'] + key).agg(name=('name', 'last'), team=('team', 'last'),
+                                                 n=('pa', 'size'), pa_sum=('pa', 'sum')).reset_index()
+    g = g[g.n >= min_games]
+    gk = g.groupby(key)
+    grp_mean = gk.apply(lambda d: d.pa_sum.sum() / d.n.sum(), include_groups=False)
+    g['grp_mean_pg'] = g.set_index(key).index.map(grp_mean)
+    g['rate'] = (g.pa_sum + K_SHRINK * g.grp_mean_pg) / (g.n + K_SHRINK)   # shrunk points-added per game
+    st = g.groupby(key).rate.agg(['mean', 'std'])
+    g['z'] = ((g.rate - g.set_index(key).index.map(st['mean'])) / g.set_index(key).index.map(st['std'])).fillna(0.0)
+    g['grade'] = (60 + 12 * g.z).clip(30, 99).round().astype(int)
+    return g.sort_values('rate', ascending=False)
+
+LEAGUE_LABEL = {'French Top 14': 'Top 14', 'Gallagher Premiership': 'Prem', 'United Rugby Championship': 'URC'}
+ALLTIME_MIN_GAMES = 15   # higher floor for a career stat than the 5-game "current form" bar
+
+def _format(R):
+    return [dict(grp=r.grp, pos=r.grp.replace('_', ' '), name=r['name'], team=r.team, n=int(r.n),
+                rate=round(float(r.rate), 2), grade=int(r.grade))
+           for _, r in R.sort_values('grade', ascending=False).iterrows()]
+
+def site_rankings():
+    """Scoped to the competitions the rest of the site already tracks (Country/Top14/Prem/URC) rather than
+    every league in the data (Pro D2, Japan League One, Mitre 10 Cup, etc. are out of scope for this site).
+    Two windows: 'current' (last 365 days of data, min 5 games - current form) and 'alltime' (every game since
+    the data starts 2022-01-01, min 15 games - there's no history before 2022 to call this truly all-time)."""
+    p, _ = load_graded()
+    out = {'current': {}, 'alltime': {}}
+    for window, days, mg in (('current', 365, MIN_GAMES), ('alltime', None, ALLTIME_MIN_GAMES)):
+        R_country = rank(p, 'country', days=days, min_games=mg)
+        R_club = rank(p, 'club', days=days, min_games=mg)
+        out[window]['Country'] = _format(R_country)
+        for full, label in LEAGUE_LABEL.items():
+            out[window][label] = _format(R_club[R_club.league == full])
+    return out
+
+if __name__ == '__main__':
+    pd.set_option('display.width', 200)
+    p, vals = load_graded()
+    print(f'rows {len(p)}  club {len(p[p.bucket=="club"])}  country {len(p[p.bucket=="country"])}')
+    R_country = rank(p, 'country')
+    print(f'\n=== COUNTRY top 5 per position (min {MIN_GAMES} games, last 365 days, T1 nations only) ===')
+    for grp, x in R_country.groupby('grp'):
+        print(f'\n{grp}:'); print(x.head(5)[['name', 'team', 'n', 'rate', 'grade']].to_string(index=False))
+
+    R_club = rank(p, 'club')
+    print(f'\n=== CLUB top 3 per position, Top 14 and Premiership only (min {MIN_GAMES} games) ===')
+    for lg in ['French Top 14', 'Gallagher Premiership']:
+        print(f'\n--- {lg} ---')
+        for grp, x in R_club[R_club.league == lg].groupby('grp'):
+            print(f'{grp}:'); print(x.head(3)[['name', 'team', 'n', 'rate', 'grade']].to_string(index=False))
+    R_club.to_parquet('rankings_club.parquet'); R_country.to_parquet('rankings_country.parquet')

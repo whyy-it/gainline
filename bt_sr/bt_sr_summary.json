@@ -4,5 +4,12 @@
  "travel": 2,
  "brier_model": 0.187788453676866,
  "brier_market": 0.18278209718207705,
- "brier_blend": 0.1832212990038665
+ "brier_blend_5050": 0.1832212990038665,
+ "blend_weight_fitted": 0.506987613149217,
+ "brier_blend_fitted": 0.18325668459527986,
+ "brier_model_shrink": 0.18791649835675173,
+ "roi_plain": -0.0018565475413130081,
+ "roi_shrink": 0.018897576943673458,
+ "n_bets_plain": 119,
+ "n_bets_shrink": 117
 }

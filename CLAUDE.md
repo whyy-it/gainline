@@ -31,7 +31,10 @@ Sanity check first: `cd model && python3 verify_site.py` → 23/23 pass.
   - Odds: `odds_pull.py` (Odds API historical closing lines, cached, `--estimate`, `--budget`) → `odds_hist.csv`;
     `backtest.py` (model vs market, bets rule, bootstrap vs 10% bar, `--books`); `odds_log.csv` + `log_round.py` (forward log).
   - `preds_oos.csv` — 2,320 out-of-sample predictions since 2023 to join to odds.
-- `site/` — `mobile_template.html` + `teamjs.js`; rebuild by substituting `__TEAMJS__` and `__DATA__` (site.json).
+- `site/` — `mobile_template.html` + `teamjs.js`, substituted with `__TEAMJS__`/`__DATA__` (site.json) by
+  `build_site.py` (repo root: `python3 build_site.py`) - writes BOTH `site/gainline.html` and the repo-root
+  `index.html` (what GitHub Pages actually serves, live at https://whyy-it.github.io/gainline/) so they can't
+  drift out of sync. Always run this after `produce.py`, never hand-edit either HTML file.
 - `bt_sr/` — first real-odds backtest (see below).
 
 ## Current models (out-of-sample)

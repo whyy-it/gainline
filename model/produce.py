@@ -8,7 +8,7 @@ Final models (each validated on unseen seasons, see README):
   Try scorer   team tries (Poisson on margin, expected points) x position share x player multiplier (k=8),
                then logistic recalibration (fitted 2024-25)"""
 import json, numpy as np, pandas as pd, warnings
-from datetime import date
+from datetime import date, datetime, timezone
 from scipy.stats import norm
 warnings.filterwarnings('ignore')
 import features as F
@@ -18,6 +18,21 @@ import sr as SR
 OUT = '../model/site.json'
 from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE, MARKET_DATE, FIX, MKT   # shared with bets.py
 HFA_I = 4.0
+_MON = {m: i + 1 for i, m in enumerate(
+    ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])}
+
+def ko_utc(ko):
+    """Every ko string in round_config.FIX is hand-entered in GMT (UTC+0 - fine year-round since GMT, unlike
+    BST, never shifts), e.g. '16:40 GMT'. ROUND_DATE gives day+month for the whole round but no year (see its
+    docstring - assumes the round is "this week"), so infer year from today, correcting for the one real edge
+    case: a round that straddles New Year's (round in Dec, checked in Jan, or vice versa)."""
+    _, day, mon = ROUND_DATE.split()
+    today = date.today()
+    year = today.year
+    if _MON[mon] == 12 and today.month == 1: year -= 1
+    elif _MON[mon] == 1 and today.month == 12: year += 1
+    h, m = map(int, ko.split()[0].split(':'))
+    return datetime(year, _MON[mon], int(day), h, m, tzinfo=timezone.utc).isoformat().replace('+00:00', 'Z')
 
 def amer(dec): return f'+{round((dec - 1) * 100)}' if dec >= 2 else f'{round(-100 / (dec - 1))}'
 
@@ -109,7 +124,7 @@ def main():
         ph = norm.cdf(w[0] + w[1] * (mg - 0.5)); pa = 1 - norm.cdf(w[0] + w[1] * (mg + 0.5))
         tot = float(np.polyval(b, s.tot)); o1, ox, o2, ln, oh, oa = MKT[h]
         sig = 1 / w[1]
-        matches.append(dict(home=h, away=a, venue=venue, ko=ko, p_home=ph, p_away=pa, p_draw=max(1 - ph - pa, 0),
+        matches.append(dict(home=h, away=a, venue=venue, ko=ko, ko_utc=ko_utc(ko), p_home=ph, p_away=pa, p_draw=max(1 - ph - pa, 0),
                             proj_home=round((tot + mg) / 2), proj_away=round((tot - mg) / 2), spread=-mg, total=tot,
                             fair_home=amer(1 / ph), fair_away=amer(1 / pa), mkt_home=amer(o1), mkt_away=amer(o2),
                             mkt_spread=ln, mdh=o1, mda=o2, p_cover_home=1 - norm.cdf(-ln, mg, sig)))

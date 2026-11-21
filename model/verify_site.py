@@ -49,6 +49,8 @@ for mt in d['matches']:
     ok &= fair == mt['fair_home']
     pc = 1 - norm.cdf(-mt['mkt_spread'], mg, w['sigma'])
     ok &= abs(pc - mt['p_cover_home']) < 1e-3
+    kh, km = map(int, mt['ko'].split()[0].split(':'))   # 'ko' is hand-entered GMT; ko_utc must agree exactly
+    ok &= mt['ko_utc'].endswith('Z') and pd.Timestamp(mt['ko_utc']).hour == kh and pd.Timestamp(mt['ko_utc']).minute == km
     check(f'Match card {h} v {a}', bool(ok))
     check(f'  win % ordering matches spread sign ({h})', (mt['p_home'] > mt['p_away']) == (mg > 0))
 

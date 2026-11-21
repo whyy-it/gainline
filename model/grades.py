@@ -24,6 +24,14 @@ def team_diffs():
     X = np.c_[[m[f] - m[f + '_o'] for f in FEATS]].T
     return p, m, X
 
+CARD_OVERRIDE = {'yellow_cards': -3.5, 'red_cards': -8.0}
+# Checked (21 Nov): the ridge fit puts BOTH cards near zero regardless of alpha (0.1-50 tried), and fitting
+# them on the residual after the other 14 features (to rule out shrinkage) makes it worse, not better -
+# red_cards flips POSITIVE. A card's cost runs entirely through the other box-score stats (a team down a
+# man naturally racks up worse tackle/turnover numbers over the rest of the game); there's no standalone
+# signal left for a discrete card coefficient to find, so the data genuinely can't answer this question.
+# Anchored here at domain-reasonable values instead of trusting a fit that's actively misleading.
+
 def learn_values(m, X, train_end='2024-08-01'):
     # margin from scores: tries*5 + kicks; use team points where recorded, else tries*7 proxy
     pts = np.where(m.points + m.points_o > 0, m.points - m.points_o, (m.tries - m.tries_o) * 7)
@@ -31,6 +39,7 @@ def learn_values(m, X, train_end='2024-08-01'):
     sign = np.array([1] * len(POS) + [-1] * len(NEG))
     rg = Ridge(alpha=10, positive=True).fit(X[tr] * sign, pts[tr])
     vals = dict(zip(FEATS, rg.coef_ * sign))
+    vals.update(CARD_OVERRIDE)
     r2 = 1 - np.mean((pts[tr] - rg.predict(X[tr] * sign)) ** 2) / np.var(pts[tr])
     return vals, r2
 

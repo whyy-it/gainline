@@ -441,3 +441,30 @@ the others aren't even covered for match odds). produce.py now calls standings_p
 run (~45s added, mostly the 3 club leagues' Monte Carlo loops - acceptable). Verified all 6 competition views
 in-browser (actual standings, not-yet-started state, qualify bars) - all render correctly. verify_site.py
 23/23.
+
+## Live-site audit, round 1 (21 Nov): stale copy + a real grading bug
+User asked to fine-tune "everything" after noticing things didn't look right on the live site. Found:
+- Header, round label, competition name, match date, and market-board date were hardcoded SEPARATELY in the
+  JS template (not data-driven) - exactly how it drifted: "Projections update... on Thursday" and "Market...
+  18 Nov" stayed frozen regardless of which day the page was actually viewed. Moved all of it into one
+  source of truth in produce.py (COMPETITION/ROUND_LABEL/ROUND_DATE/MARKET_DATE, update together with FIX/
+  MKT each week), templated from site.json. `updated` itself was never set by produce.py at all (frozen
+  passthrough, same bug class as the grades/rankings snapshots found earlier) - now auto-stamped each run.
+- Tries tab footer claimed 4 nations' players were still pending team sheets when all 12 were already listed
+  above it - made dynamic (checks which teams actually have entries).
+- Method tab claimed club lineups are rated live this season when README already said they aren't (player
+  data gap) - corrected.
+- **Real bug, not just copy**: grades.py's ridge regression puts red_cards at -0.03 and yellow_cards at ~0 -
+  essentially no penalty for a card, when any red card is one of the biggest point-swings in rugby. Checked
+  why: even at alpha=0.1 (near no regularization) cards stay near zero, and fitting them on the RESIDUAL
+  after the other 14 features makes it worse, not better - red_cards flips POSITIVE. A card's cost runs
+  entirely through the other box-score stats (a man-down team naturally racks up worse tackle/turnover
+  numbers over the rest of the game); there's no standalone signal left for a discrete card coefficient to
+  find. The data genuinely can't answer this question - fitting harder doesn't help. Anchored
+  yellow_cards=-3.5, red_cards=-8.0 (CARD_OVERRIDE in grades.py, applied inside learn_values so it propagates
+  to grades_produce.py and player_rankings.py automatically) at the values the ORIGINAL hand-weight system
+  already used, rather than invent new numbers. Honest tradeoff: single-match-margin R2 drops slightly
+  (0.646->0.599, still far above hand weights' -0.788) in exchange for a grading output that isn't actively
+  misleading. Verified: Harry Potter (sin-binned in the Aug 29 recap) went from grade 50 (card didn't even
+  make his top-3 stat list) to grade 43 with "-1 yellow card" correctly leading his key line.
+Still auditing section by section (Ratings/Rankings/Tables/Bets math next).

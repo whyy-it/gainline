@@ -64,7 +64,8 @@ for t in d['tries']:
     f = 1 / t['p']; s = f'+{round((f-1)*100)}' if f >= 2 else f'{round(-100/(f-1))}'
     ok &= s == t['fair']
 check('Try probabilities in range, odds consistent', bool(ok))
-check('Try scorers for all 12 teams', len(set(t['team'] for t in d['tries'])) == 12)
+n_round_teams = 2 * len(d['matches'])   # not hardcoded 12 - FIX shrinks as games finish and get pruned (21 Nov)
+check(f'Try scorers for all {n_round_teams} teams this round', len(set(t['team'] for t in d['tries'])) == n_round_teams)
 tt = pd.DataFrame(d['tries']).groupby('team').p.sum()
 check('No team implausibly loaded (top-3 sum < 1.8)', bool((tt < 1.8).all()), tt.round(2).to_dict())
 

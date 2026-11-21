@@ -16,17 +16,7 @@ from v6 import intl_games, elo, probit_fit, season, T1, G, CHFA, score, t1_mask
 import sr as SR
 
 OUT = '../model/site.json'
-from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE, MARKET_DATE   # shared with bets.py - see that file
-FIX = [('England', 'New Zealand', 'Twickenham', '14:10 GMT'), ('Scotland', 'Japan', 'Murrayfield', '14:10 GMT'),
-       ('Ireland', 'South Africa', 'Aviva Stadium', '16:40 GMT'), ('Italy', 'Fiji', 'Udine', '16:40 GMT'),
-       ('France', 'Argentina', 'Stade de France', '20:10 GMT'), ('Wales', 'Australia', 'Principality Stadium', '20:10 GMT')]
-# market board (decimal): 1, X, 2, home handicap, home hcp odds, away hcp odds  -- Sportingbet ZA, 17 Nov
-MKT = {'England': (2.0, 1e9, 1.7692, 0.5, 1.9434, 1.8621),
-       'Scotland': (1.005, 1e9, 18.0, -27.5, 1.8772, 1.9259),
-       'Ireland': (4.2, 1e9, 1.2083, 9.5, 1.8929, 1.9259),
-       'Italy': (1.4, 1e9, 2.85, -5.5, 1.9434, 1.8621),
-       'France': (1.0286, 1e9, 10.8, -19.5, 1.9259, 1.8929),
-       'Wales': (2.75, 1e9, 1.4255, 5.5, 1.8929, 1.9259)}
+from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE, MARKET_DATE, FIX, MKT   # shared with bets.py
 HFA_I = 4.0
 
 def amer(dec): return f'+{round((dec - 1) * 100)}' if dec >= 2 else f'{round(-100 / (dec - 1))}'

@@ -540,3 +540,42 @@ each one against what produce.py's main() actually sets, rather than trust it by
 Everything else in site.json traced to something produce.py (or bets.py, called from produce.py) actually
 sets each run. verify_site.py 23/23, confirmed in-browser (Method tab now shows 0.176/0.115 matching the live
 numbers), pushed.
+
+## Live results feed investigated; "live betting lines" investigated and confirmed not currently possible
+Asked to continue the betting work, improve model accuracy, keep stats current, and get live betting lines.
+Checked what's actually achievable before building anything:
+- **Live team-level RESULTS**: yes - ESPN's unofficial API (already used for fixtures) also returns live/
+  in-progress scores, confirmed by catching Ireland v South Africa mid-second-half while checking. League ids
+  (same ones verified in club_fixtures.py): Nations Championship 17567, Six Nations 180659.
+- **Live player-level box-score stats** (needed for Grades/Rankings/Recap): no - ESPN returns empty
+  team/player statistics arrays for this league. Tried the vendored SofaScore scraper (data/gm/scripts/
+  scrapers/sofascore.py) as a fallback - blocked with a 403 even using the same headers the original scraper
+  used. No working free source found; Grades/Rankings/Recap stay capped at the Sep 2026 data cutoff already
+  documented.
+- **Live betting lines**: no, for two different reasons depending on competition. ESPN carries no odds for
+  rugby at all (hasOdds: False on every event checked). The Odds API re-checked fresh: still only
+  rugbyunion_six_nations as a sport key, and it's now showing active:false (tournament doesn't start again
+  until Feb 2027) - nothing to pull for Nations Championship or any club league regardless. Market board
+  stays Wyatt's manual entry until Six Nations is back in season.
+
+## Built the live-results catch-up (espn_catchup.py) - and it immediately surfaced a real bug
+Pulls STATUS_FINAL results from ESPN (Nations Championship/Top14/Prem/URC) from each competition's last known
+date in build_data.py through today, prints lines formatted for build_data.py's add_rows() - does not auto-
+edit build_data.py, since new results going into the dataset every model is built on should be reviewed, not
+silently merged. Found: Top14/Prem/URC genuinely have zero new games (confirmed independently two ways -
+this script AND club_fixtures.py's own pull both show the next club round isn't until 28 Nov, an
+international-window pause, not a bug). Nations Championship: 2 of the round's 6 games were already
+STATUS_FINAL (England 37-12 New Zealand, Scotland 67-5 Japan - both considerably bigger wins than the model's
+own pre-match projections of 32-28 and 42-16). Merged into build_data.py, regenerated games.parquet ->
+SC.parquet -> site.json.
+**Real bug this surfaced**: produce.py's FIX list (this round's "upcoming" fixtures) still had England v NZ
+and Scotland v Japan in it after their results were merged - meaning the Matches/Bets/Tries tabs were about
+to show a "projection" for a game that already happened, generated from ratings that had ALREADY absorbed
+that exact game's result. Not stale copy, actively nonsensical. Removed both from FIX/MKT.
+While fixing this, found bets.py had its OWN second hardcoded copy of MKT (same duplication-drift risk as the
+round-metadata bug fixed earlier) - consolidated FIX and MKT into round_config.py alongside the round
+metadata, one source both produce.py and bets.py import.
+Also found verify_site.py's "Try scorers for all 12 teams" check was hardcoded to 12 - now that FIX shrinks
+as games finish, this would fail every round from here on. Fixed to derive the expected count from
+2*len(d['matches']) instead of a literal 12.
+verify_site.py 23/23, confirmed in-browser (Matches tab now shows only the 4 remaining games), pushed.

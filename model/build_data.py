@@ -77,7 +77,9 @@ def add_rows():
         ('2026-11-07','France',54,17,'Fiji',0),('2026-11-08','England',45,22,'Australia',0),
         ('2026-11-13','France',21,19,'South Africa',0),('2026-11-14','Italy',14,19,'Argentina',0),
         ('2026-11-14','Wales',35,28,'New Zealand',0),('2026-11-14','England',78,15,'Japan',0),
-        ('2026-11-14','Ireland',43,15,'Fiji',0),('2026-11-15','Scotland',15,12,'Australia',0)]:
+        ('2026-11-14','Ireland',43,15,'Fiji',0),('2026-11-15','Scotland',15,12,'Australia',0),
+        # Round 6 (ESPN, via espn_catchup.py - 21 Nov; other 4 R6 games not final yet at pull time)
+        ('2026-11-21','England',37,12,'New Zealand',0),('2026-11-21','Scotland',67,5,'Japan',0)]:
         A(d, h, hs, as_, a, NC, neutral=bool(n))
     # 2026-27 club seasons (Sky Sports results pages)
     top14 = """2026-11-08|Vannes|23|14|Bordeaux-Begles

@@ -13,14 +13,9 @@ from datetime import date
 from scipy.stats import norm
 
 SITE = '../model/site.json'
-MKT = {'England': (2.0, 1e9, 1.7692, 0.5, 1.9434, 1.8621),
-       'Scotland': (1.005, 1e9, 18.0, -27.5, 1.8772, 1.9259),
-       'Ireland': (4.2, 1e9, 1.2083, 9.5, 1.8929, 1.9259),
-       'Italy': (1.4, 1e9, 2.85, -5.5, 1.9434, 1.8621),
-       'France': (1.0286, 1e9, 10.8, -19.5, 1.9259, 1.8929),
-       'Wales': (2.75, 1e9, 1.4255, 5.5, 1.8929, 1.9259)}
-FLAGS = {'England': 'Most of the edge comes from NZ losing to Wales with 10 changes. Remove that game and the model has England by 2, '
-                    'about half the gap to the line, and the November touring trend favours NZ.'}
+from round_config import MKT   # was a second hardcoded copy here, drifted from produce.py's - see round_config.py
+FLAGS = {}   # was {'England': '...NZ losing to Wales with 10 changes...'} - moot now England's game is final
+            # and out of FIX/MKT (see round_config.py); still here as the place to add a new flag this round.
 
 def amer(d): return f'+{round((d - 1) * 100)}' if d >= 2 else f'{round(-100 / (d - 1))}'
 def sgn_line(team, x): return f"{team} {'+' if x > 0 else '−'}{abs(x):g}"

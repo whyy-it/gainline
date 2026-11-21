@@ -163,24 +163,29 @@ function matchCard(m){
   </article>`;
 }
 function projections(){
-  return `<div class="eyebrow">Nations Championship · Sat 21 Nov</div><h1 class="h1">Round 6</h1>
+  return `<div class="eyebrow">${D.competition} · ${D.round_date}</div><h1 class="h1">${D.round_label}</h1>
   <p class="sub">Projected score and win chance for each side. Market win % is the bookmaker price with its margin removed.</p>
   <div class="grid three">${D.matches.map(matchCard).join('')}</div>
-  <p class="note">Market: PA sportsbook, 18 Nov. Projections update when team sheets are named on Thursday.</p>`;
+  <p class="note">Market: PA sportsbook, ${D.market_date}. Projections update once final team sheets are confirmed.</p>`;
 }
 
 let tryTeam='All';
 function tryScorers(){
-  const teams=['All',...new Set(D.tries.map(t=>t.team))];
+  const have=new Set(D.tries.map(t=>t.team));
+  const teams=['All',...have];
   const rows=D.tries.filter(t=>tryTeam==='All'||t.team===tryTeam).sort((a,b)=>b.p-a.p).map(t=>`<div class="row tr">${flag(t.team,16)}
     <div><div class="t1">${t.name}</div><div class="t2" style="text-transform:capitalize">${t.team} · ${t.pos}</div></div>
     <div class="meter" aria-hidden="true"><i style="width:${Math.min(t.p,1)*100}%;background:${tcol(t.team)}"></i></div>
     <div class="big">${pct(t.p)}<small>${t.fair}</small></div></div>`).join('');
+  const roundTeams=new Set(D.matches.flatMap(m=>[m.home,m.away]));
+  const pending=[...roundTeams].filter(t=>!have.has(t));
+  const note=pending.length?`Based on recent selections. ${pending.join(', ')} ${pending.length>1?'are':'is'} added once team sheets are named.`
+                      :'Based on recent selections and this round’s confirmed team sheets.';
   return `<h1 class="h1">Anytime try scorer</h1>
   <p class="sub">Chance each player scores at least one try, with the equivalent odds underneath.</p>
   <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===tryTeam}" data-team="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
   <div class="list">${rows}</div>
-  <p class="note">Based on recent selections. Ireland, Italy, Japan and Fiji players are added when team sheets are named.</p>`;
+  <p class="note">${note}</p>`;
 }
 
 let ratLg='Tests';
@@ -272,7 +277,7 @@ function method(){
   <div class="card prose">
     <p><b>Ratings.</b> Every team carries a rating in points that moves toward each result. Tests learn from every top-tier match since 1995.</p>
     <p><b>Super Rugby.</b> Its own rating pool since 2022. Home advantage is small within a country and grows when the visitors cross the Tasman; the Drua get a large edge at home in Fiji.</p>
-    <p><b>Lineups.</b> Club matchday squads are rated player by player and compared with each side's usual strength.</p>
+    <p><b>Lineups.</b> Club matchday squads can be rated player by player and compared with each side's usual strength - validated, but not live for the current season (player data needs catching up), so this season's club ratings are rating-only for now.</p>
     <p><b>Scores.</b> Attack and defence ratings project each side's points; the margin comes from the rating gap plus home advantage.</p>
     <p><b>Try scorers.</b> Team expected tries, split by position and adjusted for each player's finishing record.</p>
     <p><b>Testing.</b> Every number above is out of sample: each season is predicted using only the seasons before it.</p>
@@ -304,7 +309,7 @@ function bets(){
     return `<div class="row tr">${flag(t.team,16)}<div><div class="t1">${t.name}</div><div class="t2">${t.team} · ${pct(t.p)} to score</div></div>
       <div class="big" style="font-size:16px">${t.bet_at}<small>or longer</small></div><div class="big" style="font-size:15px">${money(BANK*f)}<small>${(f*100).toFixed(1)}%</small></div></div>`}).join('');
   return `<div class="eyebrow">Private · remove before publishing</div><h1 class="h1">Bets · Round 6</h1>
-  <p class="sub">${B.rules}. Moneylines are draw-no-bet. Stakes are ⅛ Kelly (Lean: 1/16). Lines: ${B.lines}; recheck after Thursday's team sheets.</p>
+  <p class="sub">${B.rules}. Moneylines are draw-no-bet. Stakes are ⅛ Kelly (Lean: 1/16). Lines: ${B.lines}; recheck once final team sheets are confirmed.</p>
   <div class="card bank"><label for="bank">Bankroll</label><input id="bank" type="number" inputmode="decimal" min="0" step="50" value="${BANK}"></div>
   <div class="grid">${cards}</div>
   <div class="sec">Passes</div><div class="list">${passes}</div>

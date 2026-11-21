@@ -8,6 +8,7 @@ Final models (each validated on unseen seasons, see README):
   Try scorer   team tries (Poisson on margin, expected points) x position share x player multiplier (k=8),
                then logistic recalibration (fitted 2024-25)"""
 import json, numpy as np, pandas as pd, warnings
+from datetime import date
 from scipy.stats import norm
 warnings.filterwarnings('ignore')
 import features as F
@@ -15,6 +16,13 @@ from v6 import intl_games, elo, probit_fit, season, T1, G, CHFA
 import sr as SR
 
 OUT = '../model/site.json'
+# Round metadata - update ALL FOUR of these together each week (FIX/MKT too). They used to live hardcoded
+# separately in mobile_template.html, which is exactly how the "Thursday"/"18 Nov" copy went stale (21 Nov) -
+# one source of truth now, templated into the page instead of hand-edited there.
+COMPETITION = 'Nations Championship'
+ROUND_LABEL = 'Round 6'
+ROUND_DATE = 'Sat 21 Nov'
+MARKET_DATE = '18 Nov'
 FIX = [('England', 'New Zealand', 'Twickenham', '14:10 GMT'), ('Scotland', 'Japan', 'Murrayfield', '14:10 GMT'),
        ('Ireland', 'South Africa', 'Aviva Stadium', '16:40 GMT'), ('Italy', 'Fiji', 'Udine', '16:40 GMT'),
        ('France', 'Argentina', 'Stade de France', '20:10 GMT'), ('Wales', 'Australia', 'Principality Stadium', '20:10 GMT')]
@@ -111,7 +119,9 @@ def main():
     game_recap = RC.recap()
     standings = SP.all_standings()
     d = json.load(open(OUT))          # keep bets text (betsTab is hand-maintained, see bets.py)
-    d.update(matches=matches, intl=[dict(team=t, rating=round(float(v), 2)) for t, v in T1L], club=club_ratings(),
+    d.update(updated=date.today().strftime('%-d %b'), competition=COMPETITION, round_label=ROUND_LABEL,
+             round_date=ROUND_DATE, market_date=MARKET_DATE, matches=matches,
+             intl=[dict(team=t, rating=round(float(v), 2)) for t, v in T1L], club=club_ratings(),
              sr=super_rugby(), tries=tries, grades=graded, grades_match=grades_match,
              grade_values={k: round(float(v), 4) for k, v in grade_values.items()}, rankings=rankings,
              recap=game_recap, standings=standings)

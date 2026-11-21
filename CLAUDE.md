@@ -73,5 +73,6 @@ Model Brier 0.1878 vs market **0.1828**; blend 0.1832 (model adds nothing). Bets
 
 ## Open items
 - About 10 Prem 2025–26 games are missing from the source.
-- No 2026–27 club squad data (player data ends Sep 2026).
+- Player data now runs through 21 Nov 2026 via World Rugby's Pulse API (`wr_stats_sync.py` + `wr_stats_merge.py`,
+  see README) — minutes-played exists for these rows only; still run by hand, not scheduled.
 - Bets tab on the site uses Wyatt's PA-book board from 18 Nov (prices in `bets.py` MKT, decimal).

@@ -9,7 +9,19 @@ points; the other 17 are short by EXACTLY 7 (one try+conversion), never any othe
 penalty try, not a data error. Corrected for team_match_stats.parquet's 'tries' column specifically (it feeds
 the four-try/three-try-differential bonus rules in league_sim.py/top14_sim.py) by adding +1 there whenever
 the points gap is exactly 7; left player_stats.parquet alone (individual stats are correct as-is, the gap
-only appears when you sum them)."""
+only appears when you sum them).
+
+Identity reconciliation (added after the first merge shipped - found while wiring minutes into
+player_rankings.py): World Rugby's player ids (wr_<their id>) live in a totally different id space from the
+existing data's. Checked by name: Maxime Lucu, Ben Earl, Baptiste Serin etc. all already had years of history
+under an old id (e.g. '3c388133') and would have gotten a SECOND, disjoint 'wr_...' id for just their new
+games - fragmenting one real player's career into two identities, which silently breaks exactly the kind of
+"games in the last 365 days" rollup player_rankings.py does (neither half reaches the min-games bar on its
+own). 1534 of 2004 new (name, team) pairs matched an existing identity exactly; collision risk from reusing
+old ids is low (only 58 of 20889 old (name, team) pairs ever mapped to >1 id - presumably two actually-
+different people who share a name at the same club) and those ambiguous ones are deliberately left unmapped
+rather than guessed at - new players (true debutants, or a name/team that doesn't match the old spelling)
+correctly keep a fresh wr_ id."""
 import pandas as pd
 
 FEATS = ['tries', 'line_breaks', 'defenders_beaten', 'metres_carried', 'carries', 'offloads', 'tackles_made',
@@ -53,6 +65,19 @@ if __name__ == '__main__':
     if dup:
         print(f'{len(dup)} match_ids already present - dropping from the new batch (should be 0, these are new wr_ ids)')
         P_new = P_new[~P_new.match_id.isin(dup)]
+
+    # reconcile identities: reuse the existing player_id for any (name, team) pair that unambiguously already
+    # had one, instead of letting every new row mint its own fresh wr_... id (see docstring)
+    pair_ids = P_old.groupby(['name', 'team']).player_id.nunique()
+    unambiguous = pair_ids[pair_ids == 1].index
+    id_map = P_old[P_old.set_index(['name', 'team']).index.isin(unambiguous)].drop_duplicates(['name', 'team']) \
+        .set_index(['name', 'team']).player_id
+    new_keys = P_new.set_index(['name', 'team']).index
+    remapped = new_keys.map(id_map)
+    n_remapped = remapped.notna().sum()
+    P_new['player_id'] = remapped.where(remapped.notna(), P_new.player_id).values
+    print(f'{n_remapped} of {len(P_new)} new rows matched to an existing player identity by (name, team); '
+          f'{len(P_new) - n_remapped} kept a fresh wr_ id (new player, or name/team spelling mismatch)')
 
     # union columns both ways - don't drop new fields the old data never had (e.g. 'minutes', first time
     # available at all) just because old rows can't backfill them, and don't drop old fields new data lacks

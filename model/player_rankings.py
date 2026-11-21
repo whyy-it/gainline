@@ -1,9 +1,13 @@
 """Club & country player rankings. Builds on grades_produce.py's validated data-driven weights (R2=0.65
 single-match, vs hand weights' -0.79 - see README) but aggregates across games instead of one match.
-No minutes-played field exists in player_stats.parquet, so "current form" = shrunk mean points-added per
-game over the last 365 days of available data (capped ~2026-09-06, the same data-cutoff noted in README/
-CLAUDE.md), empirical-Bayes shrunk toward the position group's mean with k pseudo-games - same recipe
+"current form" = shrunk mean points-added per 80-minutes-equivalent over the last 365 days of available
+data, empirical-Bayes shrunk toward the position group's mean with k pseudo-(80-min-windows) - same recipe
 tries.py and lineup_value.py already use elsewhere in this repo, for consistency.
+Minutes-played only exists for the World Rugby sync rows added 21 Nov (wr_stats_sync.py); every older row has
+no minutes field at all, so those are filled to a full 80 - same as the old implicit assumption, before
+minutes existed, that every appearance in player_stats.parquet was a full match. Means a Sep-2026-and-earlier
+appearance and a post-sync one with minutes=80 are treated identically; only the new partial-game rows (subs
+coming on, players going off early) get properly weighted down instead of counted as a full game played.
 Club and country are scored SEPARATELY: a player's club form and Test form can differ, and the eligible
 player pool differs a lot (every league vs only capped internationals), so z-scoring them together would
 be apples-to-oranges."""
@@ -24,6 +28,8 @@ def load_graded():
     tm = pd.read_parquet('team_match_stats.parquet'); tm = tm[tm.ok]
     p = p[p.set_index(['match_id', 'team']).index.isin(tm.set_index(['match_id', 'team']).index)].copy()
     for f in FEATS + ['points']: p[f] = p[f].fillna(0)
+    p['minutes'] = p['minutes'].fillna(80.0)   # pre-sync rows have no minutes field at all - assume a full match,
+    # matching the old (pre-minutes) implicit behaviour exactly so this only changes rows that newly have real data
     p['grp'] = p.position.map(GROUP)
     p = p[p.grp.notna()]
     comp = p.competition.fillna(p.set_index(['match_id', 'team']).index.map(
@@ -48,12 +54,14 @@ def rank(p, bucket, days=365, min_games=MIN_GAMES):
     key = ['league', 'grp'] if bucket == 'club' else ['grp']
     recent = x if days is None else x[x.date >= x.date.max() - pd.Timedelta(days=days)]
     g = recent.groupby(['player_id'] + key).agg(name=('name', 'last'), team=('team', 'last'),
-                                                 n=('pa', 'size'), pa_sum=('pa', 'sum')).reset_index()
-    g = g[g.n >= min_games]
+                                                 n=('pa', 'size'), pa_sum=('pa', 'sum'),
+                                                 min_sum=('minutes', 'sum')).reset_index()
+    g = g[g.n >= min_games]   # sample-size bar stays games played, not minutes - still 5 independent matches
+    g['games_eq'] = g.min_sum / 80.0   # minutes-equivalent games; == n exactly for pre-sync players (minutes=80 always)
     gk = g.groupby(key)
-    grp_mean = gk.apply(lambda d: d.pa_sum.sum() / d.n.sum(), include_groups=False)
+    grp_mean = gk.apply(lambda d: d.pa_sum.sum() / d.games_eq.sum(), include_groups=False)
     g['grp_mean_pg'] = g.set_index(key).index.map(grp_mean)
-    g['rate'] = (g.pa_sum + K_SHRINK * g.grp_mean_pg) / (g.n + K_SHRINK)   # shrunk points-added per game
+    g['rate'] = (g.pa_sum + K_SHRINK * g.grp_mean_pg) / (g.games_eq + K_SHRINK)   # shrunk points-added per 80 min
     st = g.groupby(key).rate.agg(['mean', 'std'])
     g['z'] = ((g.rate - g.set_index(key).index.map(st['mean'])) / g.set_index(key).index.map(st['std'])).fillna(0.0)
     g['grade'] = (60 + 12 * g.z).clip(30, 99).round().astype(int)

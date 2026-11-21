@@ -633,3 +633,32 @@ team_match_stats.parquet 9877 -> 10197 rows. Player-data cutoff moves from Sep 2
 Not yet wired into player_rankings.py's rate stats (minutes is available now but nothing uses it as a
 denominator yet) or scheduled to run automatically - both still open. verify_site.py 23/23 after rerunning
 produce.py/build_site.py on the merged data.
+
+## Wired minutes into player_rankings.py - and caught a second, bigger merge bug doing it
+Changed player_rankings.py's "current form" rate from shrunk points-added PER GAME to shrunk points-added
+PER 80-MINUTES-EQUIVALENT (games_eq = minutes_sum / 80), since minutes now exists for the World Rugby rows.
+Pre-sync rows have no minutes field at all, so they're filled to a full 80 - games_eq == n exactly for every
+player untouched by the sync, so this is a no-op for old data and only changes players whose new appearances
+are genuine partial games (subs), which is the whole point.
+
+**Caught while sanity-checking the wiring**: Maxime Lucu, Ben Earl, Baptiste Serin and others were showing up
+with exactly 9-10 games in the last 365 days, ALL of them wr_-sourced - suspicious for players who've started
+most of this season. Checked: wr_stats_sync.py mints every player_id as `wr_<World Rugby's own id>`, a
+completely different id space from the existing data's (e.g. Maxime Lucu's long-standing id is '3c388133').
+Every player who appeared in BOTH the old data and the new sync got a second, disjoint identity - fragmenting
+one real player's career into two rows in player_stats.parquet. This silently wrecked exactly the "games in
+the last 365 days" rollup player_rankings.py does: a player's pre-sync and post-sync appearances landed under
+different ids, so neither half alone could reach the 5-game minimum unless the sync window alone had 5+ games
+(which, with a congested Top14/Prem schedule, 10 of them coincidentally did - that's what made them visible).
+Checked the damage before fixing: 1534 of 2004 new (name, team) pairs matched an existing identity exactly.
+Fixed in wr_stats_merge.py: build a (name, team) -> player_id map from the OLD data, keeping only pairs that
+mapped to exactly one id (58 of 20889 pairs were ambiguous - two different people sharing a name at the same
+club - left those alone rather than guess), and remap new rows onto the existing id wherever it matches.
+Genuinely new players (debutants, or a name/team that doesn't match the old spelling) correctly keep a fresh
+wr_ id. Re-ran: 5724 of 7357 new rows reconciled to an existing identity. Confirmed Maxime Lucu etc. now show
+one continuous player_id with their full career length (129, 135, 118, 114 games respectively, not 9-10).
+Re-ran produce.py/build_site.py/verify_site.py (23/23) on the corrected data - rankings output now shows
+materially higher game counts per player (e.g. fly_half top-3 n=12-13 vs 5-10 before), confirming players are
+no longer being undercounted. The previously-shipped merge (player_stats.parquet with the fragmented ids) had
+already been committed and pushed; reset both parquet files to their pre-merge commit and redid the merge
+with the fix rather than patching the broken ids in place, so there's one clean merge in history, not two.

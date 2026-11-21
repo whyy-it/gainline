@@ -58,13 +58,20 @@ def build_team_match_stats(P, M):
 if __name__ == '__main__':
     P_new = pd.read_csv('new_player_stats_staging.csv', parse_dates=['date'], dtype={'game_date': str, 'player_id': str, 'match_id': str})
     M_new = pd.read_csv('new_match_meta_staging.csv', parse_dates=['date'])
+    if P_new.empty:
+        print('no new matches in the staging files - nothing to merge, parquet files untouched')
+        raise SystemExit(0)
     P_old = pd.read_parquet('player_stats.parquet')
     TM_old = pd.read_parquet('team_match_stats.parquet')
 
     dup = set(P_old.match_id) & set(P_new.match_id)
     if dup:
-        print(f'{len(dup)} match_ids already present - dropping from the new batch (should be 0, these are new wr_ ids)')
+        print(f'{len(dup)} match_ids already present - dropping from the new batch (the daily sync overlaps '
+              f'3 days with the last run on purpose; these are already-merged matches re-fetched, not an error)')
         P_new = P_new[~P_new.match_id.isin(dup)]
+    if P_new.empty:
+        print('every matched row was already merged - nothing new, parquet files untouched')
+        raise SystemExit(0)
 
     # reconcile identities: reuse the existing player_id for any (name, team) pair that unambiguously already
     # had one, instead of letting every new row mint its own fresh wr_... id (see docstring)

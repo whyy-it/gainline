@@ -662,3 +662,23 @@ materially higher game counts per player (e.g. fly_half top-3 n=12-13 vs 5-10 be
 no longer being undercounted. The previously-shipped merge (player_stats.parquet with the fragmented ids) had
 already been committed and pushed; reset both parquet files to their pre-merge commit and redid the merge
 with the fix rather than patching the broken ids in place, so there's one clean merge in history, not two.
+
+## Scheduled the player-stats sync (.github/workflows/sync_player_stats.yml)
+Runs the wr_stats_sync.py -> wr_stats_merge.py pipeline daily via GitHub Actions (no key/secret needed - the
+World Rugby API is open) rather than depending on Wyatt's Mac being on. Scope deliberately stops at player
+box-score stats (Grades/Rankings/Recap) - match RESULTS stay a manual step via espn_catchup.py, unchanged,
+since those feed win probabilities and the Bets tab and this project's convention is that data shouldn't
+silently change what every model is built on without a look first (see the live-results section above).
+Three things had to change to make an unattended daily run safe:
+- wr_stats_sync.py's start/end dates were hardcoded literals ('2026-09-07'/'2026-11-21') - would have needed
+  hand-editing before every run. Now defaults to (latest date already in player_stats.parquet - 3 days) through
+  today; the 3-day overlap is deliberate (catches a slow-to-post result) and harmless (wr_stats_merge.py already
+  dedupes by match_id).
+- Both scripts now handle "zero new matches" (the common case - most days fall between rounds) as a clean
+  no-op that exits 0 without touching the parquet files, instead of crashing on an empty dataframe with no
+  columns.
+- verify_site.py now calls sys.exit(1) on any failed check (previously just printed) so the workflow can gate
+  the commit/push on all 23 passing - a bad build is never published automatically.
+The workflow: pull -> merge -> if (and only if) the parquet files actually changed, produce.py -> build_site.py
+-> verify_site.py -> commit + push to main. A no-new-data day touches nothing. Tested all three code paths
+locally (found-and-merged, found-but-already-merged, zero-found-at-all) before relying on it to run unattended.

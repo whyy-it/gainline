@@ -14,10 +14,23 @@ against games.parquet's known team universe, which is far cheaper than ESPN's da
 
 Run from model/: python3 wr_stats_sync.py [start_date] [end_date] - writes to staging CSVs for review
 (new_player_stats_staging.csv, new_team_match_stats_staging.csv), does NOT touch the real parquet files -
-merge after reviewing."""
+merge after reviewing.
+
+With no args (the scheduled-run case, see .github/workflows/sync_player_stats.yml), start defaults to 3 days
+before the latest date already in player_stats.parquet - a small overlap is harmless since wr_stats_merge.py
+already drops any match_id it's seen before - and end defaults to today, so a daily cron run always catches
+whatever finished since the last run without anyone updating a hardcoded date."""
 import sys, time, requests
+from datetime import date, timedelta
 import pandas as pd
 from build_data import norm
+
+COLS = ['tries', 'try_assists', 'line_breaks', 'defenders_beaten', 'metres_carried', 'carries', 'offloads',
+        'passes', 'kicks', 'tackles_made', 'tackles_missed', 'turnovers_won', 'turnovers_lost',
+        'penalties_conceded', 'yellow_cards', 'red_cards', 'lineouts_won', 'rucks_won', 'conversion_goals',
+        'penalty_goals', 'drop_goals_converted', 'points', 'dominant_tackles', 'minutes', 'player_id', 'name',
+        'team', 'position', 'match_id', 'game_date', 'competition', 'team_vs', 'date']   # explicit header even
+# when 0 matches are found - keeps the staging CSV's schema stable for wr_stats_merge.py to read either way
 
 H = {'User-Agent': 'Mozilla/5.0 (compatible; Gainline/1.0)'}
 BASE = 'https://api.wr-rims-prod.pulselive.com/rugby/v3'
@@ -117,8 +130,9 @@ def fetch_match(match_id, comp):
                       away=teams.get(team_ids[1]) if len(team_ids) > 1 else None, scores=mt.get('scores'))
 
 if __name__ == '__main__':
-    start = sys.argv[1] if len(sys.argv) > 1 else '2026-09-07'
-    end = sys.argv[2] if len(sys.argv) > 2 else '2026-11-21'
+    default_start = (pd.read_parquet('player_stats.parquet').date.max() - timedelta(days=3)).strftime('%Y-%m-%d')
+    start = sys.argv[1] if len(sys.argv) > 1 else default_start
+    end = sys.argv[2] if len(sys.argv) > 2 else date.today().strftime('%Y-%m-%d')
     known = set(pd.read_parquet('games.parquet').pipe(lambda g: set(g.home) | set(g.away)))
     print(f'pulling World Rugby match list {start} to {end}...')
     ml = match_list(start, end)
@@ -138,9 +152,10 @@ if __name__ == '__main__':
             print(f'  skip {mid}: {e}', file=sys.stderr)
         if i % 20 == 0: print(f'  {i}/{len(targets)}...')
         time.sleep(0.15)
-    P = pd.DataFrame(all_rows)
+    P = pd.DataFrame(all_rows, columns=COLS) if all_rows else pd.DataFrame(columns=COLS)
     print(f'\n{len(P)} player-rows from {len(meta_rows)} matches')
     print(P.groupby('competition').match_id.nunique() if len(P) else 'none')
     P.to_csv('new_player_stats_staging.csv', index=False)
-    pd.DataFrame(meta_rows).to_csv('new_match_meta_staging.csv', index=False)
+    pd.DataFrame(meta_rows, columns=['match_id', 'date', 'competition', 'home', 'away', 'scores']) \
+        .to_csv('new_match_meta_staging.csv', index=False)
     print('wrote new_player_stats_staging.csv, new_match_meta_staging.csv - review before merging')

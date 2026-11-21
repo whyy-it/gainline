@@ -1,7 +1,8 @@
 """Independent cross-check of every number on Gainline.
 Re-implements the Test rating loop from scratch (no shared code), re-derives probabilities, scores, odds,
-EVs and stakes, and checks the HTML actually carries site.json. Prints PASS/FAIL per check."""
-import json, re, numpy as np, pandas as pd
+EVs and stakes, and checks the HTML actually carries site.json. Prints PASS/FAIL per check, exits non-zero
+on any failure so sync_player_stats.yml's scheduled run won't commit/push a bad build."""
+import sys, json, re, numpy as np, pandas as pd
 from scipy.stats import norm
 
 d = json.load(open('../model/site.json'))
@@ -76,3 +77,4 @@ check('Super Rugby 11 teams, centred', len(d['sr']) == 11 and abs(sum(x['rating'
 check('Test ratings sorted', [x['rating'] for x in d['intl']] == sorted([x['rating'] for x in d['intl']], reverse=True))
 
 print('\n%d checks failed' % len(fails) if fails else '\nAll checks passed')
+sys.exit(1 if fails else 0)

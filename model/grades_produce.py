@@ -1,6 +1,6 @@
 """Reproduces the site's Grades tab (previously a frozen, unreproducible snapshot - see model/README.md).
-Picks the most recent high-profile completed match with full player stats (player_stats.parquet has a hard
-cutoff ~Sep 2026 - see README open items), grades every player in it, and writes grades/grades_match/
+Picks the most recent high-profile completed match with full player stats (player_stats.parquet is synced
+daily via World Rugby's Pulse API - see README), grades every player in it, and writes grades/grades_match/
 grade_values into site.json. Run after produce.py, or import player_grades() from it.
 
 Weights: the README's hand-vs-data-driven finding ("equal within noise") was on a DIFFERENT objective -
@@ -14,7 +14,7 @@ validated choice for the lineup-strength betting feature specifically; this scri
 """
 import json, numpy as np, pandas as pd
 from tries import GROUP
-from grades import team_diffs, learn_values, grade, FEATS
+from grades import team_diffs, learn_values, grade, historical_group_stats, FEATS
 
 ABBR = {'line_breaks': 'LB', 'defenders_beaten': 'DB', 'metres_carried': 'm', 'carries': 'car', 'offloads': 'offld',
         'tackles_made': 'tkl', 'turnovers_won': 'TO won', 'lineouts_won': 'LO', 'kicks': 'kicks', 'dominant_tackles': 'dom tkl',
@@ -71,9 +71,11 @@ def pick_match():
 def player_grades():
     p, m, X = team_diffs()
     vals, hand = fit_report(m, X)
+    hist = historical_group_stats(p, vals)   # stable per-position mean/variance - a single match's own group
+    # can be as few as 4-10 players, too noisy to z-score against alone (see grades.py docstring, 22 Nov)
     mid, roster, label = pick_match()
     for f in FEATS + ['points']: roster[f] = roster[f].fillna(0)
-    graded = grade(roster, vals)   # data-driven weights - validated for THIS (single-match) objective above
+    graded = grade(roster, vals, hist=hist)   # data-driven weights - validated for THIS (single-match) objective above
     out = []
     for _, r in graded.sort_values('grade', ascending=False).iterrows():
         out.append(dict(team=r.team, name=r['name'], pos=r.grp.replace('_', ' '), grade=int(r.grade),

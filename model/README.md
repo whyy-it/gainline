@@ -755,3 +755,28 @@ projection - gave an immediate end-to-end test of the FINAL-score path on real d
   rendering unconditional on any change - cheap even for a hidden tab, and guarantees the DOM catches up.
 verify_site.py checks the new `live` config block (ESPN league id matches round_config, wr_field_map covers
 every grade_values stat). 26/26 checks pass.
+
+## Fixed a real statistical bug in single-match player grades
+Asked "how does this make sense" about the Grades tab: a sub forward with +3.7 points-added (Seb Stephen,
+Scotland 67-5 Japan) graded 84 - the match's TOP grade - ahead of a back-rower with +13.4 (Liam McConnell)
+and a hat-trick winger with +24.8 (Darcy Graham). Root cause: grade() z-scores a player against their OWN
+position group, but that group is whoever happened to play that ONE position in that ONE match - as few as
+4 (wing), 6 (back_row) or 10 (sub_fwd) players. Checked the actual numbers: sub_fwd's group that match
+clustered tight near zero (mean 0.09, std 1.84, mostly players with a handful of late-game minutes), so
+Stephen's modest +3.7 was ~2 std above a group with almost no natural spread, while back_row (mean 4.19, std
+4.90) and wing (mean 9.13, std 11.18) had much wider natural variance that match, making even much bigger
+raw contributions look like smaller z-scores. A real instability, not a display bug - single-match groups
+this small give a noisy mean/std to divide by.
+`player_rankings.py` already solves the identical small-sample problem (empirical-Bayes shrinkage toward a
+stable group mean, documented in its own docstring) but grade()'s single-match z-score never got that
+treatment. Checked the fix against real historical data rather than guessing: computed each position group's
+(mean, variance) of points-added across every match in player_stats.parquet (tens of thousands of rows per
+group - `historical_group_stats()` in grades.py), then shrunk each match's own small-sample mean/variance
+toward that stable baseline with K pseudo-players. Tried K=10/20/40 against the Scotland v Japan case:
+- K=10: Stephen 84->85, McConnell 83->96, Graham 77->96. Fixes the ordering (standouts now clearly outrank
+  the modest cameo) while keeping McConnell/Graham differentiated from each other - the full match's grade
+  list re-sorts sensibly by actual contribution (McConnell/Graham at top, then Horne +14.2 at 95, Stephen
+  +3.7 down at 85, Dobie +19.2 at 84, in a much more intuitive order than before).
+- K=20/40: over-corrects - both standout performers clip to the 99 ceiling, losing the ability to tell an
+  excellent performance from a historically exceptional one.
+K=10 kept. Re-ran produce.py/build_site.py/verify_site.py - 26/26, grades output now matches the table above.

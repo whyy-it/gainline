@@ -186,10 +186,18 @@ def main():
     rankings = PR.site_rankings()
     game_recap = RC.recap()
     standings = SP.all_standings()
-    d = json.load(open(OUT))          # keep bets text (betsTab is hand-maintained, see bets.py)
+    try:
+        d = json.load(open(OUT))      # keep bets text (betsTab is hand-maintained, see bets.py)
+    except FileNotFoundError:
+        # site.json is gitignored (it carries betsTab - see README, 22 Nov), so a fresh checkout - a new
+        # clone, or CI - has none at all. Found this the hard way: the first real CI run of the "Rebuild
+        # site" workflow crashed right here. Starting from {} is correct either way - bets.build() always
+        # rewrites betsTab from scratch regardless, there's nothing real to "keep" on a true first run.
+        d = {}
     d.pop('round', None); d.pop('matches', None); d.pop('competition', None); d.pop('round_label', None)
     d.pop('round_date', None)   # all replaced by `rounds` (22 Nov) - drop the old single-round fields outright
     # rather than leave a stale copy no code reads anymore (same "orphaned field" mistake found 21 Nov, see README)
+    d.setdefault('backtest', {})
     d.update(updated=date.today().strftime('%-d %b'), rounds=rounds, market_date=MARKET_DATE,
              intl=[dict(team=t, rating=round(float(v), 2)) for t, v in T1L], club=club_ratings(),
              sr=super_rugby(), tries=tries, grades=graded, grades_match=grades_match,

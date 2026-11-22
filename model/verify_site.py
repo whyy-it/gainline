@@ -2,7 +2,7 @@
 Re-implements the Test rating loop from scratch (no shared code), re-derives probabilities, scores, odds,
 EVs and stakes, and checks the HTML actually carries site.json. Prints PASS/FAIL per check, exits non-zero
 on any failure so sync_player_stats.yml's scheduled run won't commit/push a bad build."""
-import sys, json, re, numpy as np, pandas as pd
+import sys, json, re, pathlib, numpy as np, pandas as pd
 from scipy.stats import norm
 
 d = json.load(open('../model/site.json'))
@@ -12,10 +12,21 @@ def check(name, ok, detail=''):
     print(('PASS ' if ok else 'FAIL ') + name + (f'  [{detail}]' if detail and not ok else ''))
     if not ok: fails.append(name)
 
-# 1. HTML embeds exactly site.json
+# 1. Public HTML (what's actually committed/served - CLAUDE.md: "the Bets tab is private") carries every
+# non-betting number from site.json, and genuinely carries NO betting content - not just a hidden tab, the
+# data itself must be absent (see build_site.py, 22 Nov). The private local build, if present, must still
+# carry betsTab correctly - gated separately since it's gitignored and won't exist on a fresh clone.
 m = re.search(r'const D = (\{.*?\});\n', html, re.S)
 emb = json.loads(m.group(1)) if m else None
-check('HTML carries site.json', emb is not None and emb['matches'] == d['matches'] and emb['tries'] == d['tries'] and emb['betsTab']['bets'] == d['betsTab']['bets'])
+check('Public HTML carries matches/tries', emb is not None and emb['matches'] == d['matches'] and emb['tries'] == d['tries'])
+check('Public HTML has no betting content', emb is not None and 'betsTab' not in emb and 'remove before publishing' not in html.lower())
+priv = pathlib.Path('../site/gainline_private.html')
+if priv.exists():
+    pm = re.search(r'const D = (\{.*?\});\n', priv.read_text(), re.S)
+    pemb = json.loads(pm.group(1)) if pm else None
+    check('Private HTML carries betsTab matching site.json', pemb is not None and pemb.get('betsTab', {}).get('bets') == d['betsTab']['bets'])
+else:
+    print('SKIP Private HTML check (site/gainline_private.html not built - run build_site.py)')
 
 # 2. Independent Test ratings: fresh Elo loop over the same inputs
 G = pd.read_parquet('../model/games.parquet')

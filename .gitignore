@@ -4,3 +4,8 @@ __pycache__/
 data/rugbydata/
 odds_cache/
 model/new_*_staging.csv
+# model/site.json carries the Bets tab (real sportsbook lines, EV%, Kelly stakes) - never commit it to this
+# public repo. It's fully regenerable: python3 produce.py. build_site.py strips betsTab before writing the
+# public index.html/site/gainline.html, and writes the untouched full data to this private-only local file.
+model/site.json
+site/gainline_private.html

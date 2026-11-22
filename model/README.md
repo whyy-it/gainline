@@ -682,3 +682,27 @@ Three things had to change to make an unattended daily run safe:
 The workflow: pull -> merge -> if (and only if) the parquet files actually changed, produce.py -> build_site.py
 -> verify_site.py -> commit + push to main. A no-new-data day touches nothing. Tested all three code paths
 locally (found-and-merged, found-but-already-merged, zero-found-at-all) before relying on it to run unattended.
+
+## Found the Bets tab was live and public - built an actual public/private split
+While checking a UI spacing complaint, found the Bets tab - real sportsbook lines, EV%, Kelly stakes, a
+bankroll calculator - visibly live on https://whyy-it.github.io/gainline/, with a literal leftover dev note
+("Private · remove before publishing") rendered right above it. Direct violation of CLAUDE.md's hard rule
+("the Bets tab is private") that had apparently never actually been implemented - one template, one
+site.json, written straight to the public index.html/site/gainline.html since day one. Worse: model/site.json
+itself was committed to this now-public repo with betsTab's full contents, so the HTML wasn't even the only
+leak - the raw JSON was sitting in the repo too (and, as of this fix, in its git history - noted for Wyatt;
+scrubbing that needs a history rewrite, which is a separate, bigger call than this fix made unilaterally).
+Fixed properly rather than just deleting the reminder text:
+- model/site.json is no longer committed (git rm --cached, now gitignored) - it's 100% regenerable via
+  python3 produce.py, no reason for a file containing betting content to live in a public repo at all.
+- build_site.py now writes the public files (site/gainline.html, index.html) from a copy of the data with
+  betsTab deleted, and separately writes the full data (betsTab intact) to site/gainline_private.html - a new,
+  gitignored, local-only file. Same template drives both; mobile_template.html only registers the Bets
+  nav link/route when D.betsTab is actually present, so the public build simply has no way to reach it,
+  not just a hidden button - the data itself is absent from what ships.
+- verify_site.py's old check ("HTML carries site.json") assumed gainline.html always had betsTab - split into
+  three: public HTML has matches/tries, public HTML has NO betting content (checks both the embedded JSON and
+  the literal old reminder string), and (when gainline_private.html exists locally) it carries betsTab
+  correctly.
+Also fixed, same investigation: main's top padding (16px) read as too tight below the sticky nav on every
+tab - bumped to 24px.

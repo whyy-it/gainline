@@ -35,7 +35,7 @@ nav::-webkit-scrollbar{display:none}
 nav a{flex:none;font:600 14px/1 var(--display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-decoration:none;padding:9px 8px 10px;border-bottom:2.5px solid transparent}
 nav a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
 a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-main{padding:16px 0 calc(28px + env(safe-area-inset-bottom))}
+main{padding:24px 0 calc(28px + env(safe-area-inset-bottom))}
 .eyebrow{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
 .h1{font:700 22px/1.05 var(--display);text-transform:uppercase;margin:0 0 4px;text-wrap:balance}
 .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px;max-width:62ch}
@@ -137,6 +137,9 @@ main{padding:16px 0 calc(28px + env(safe-area-inset-bottom))}
 <script>
 const D = __DATA__;
 __TEAMJS__
+// Bets is private - build_site.py omits betsTab entirely from the public build, so this nav link/view only
+// exists when it's actually present (Wyatt's local gainline_private.html). No betsTab -> no link, no route.
+if(!D.betsTab) document.querySelector('a[href="#bets"]')?.remove();
 const pct = x => Math.round(x*100)+'%';
 const CODE={'England':'ENG','New Zealand':'NZ','Scotland':'SCO','Japan':'JPN','Ireland':'IRE','South Africa':'RSA','Italy':'ITA','Fiji':'FIJ','France':'FRA','Argentina':'ARG','Wales':'WAL','Australia':'AUS'};
 const half = x => (Math.round(Math.abs(x)*2)/2).toFixed(1);
@@ -312,7 +315,7 @@ function bets(){
   const tries=B.tries.map(t=>{const d=toDec(t.bet_at); const f=0.05/(d-1)/8;
     return `<div class="row tr">${flag(t.team,16)}<div><div class="t1">${t.name}</div><div class="t2">${t.team} · ${pct(t.p)} to score</div></div>
       <div class="big" style="font-size:16px">${t.bet_at}<small>or longer</small></div><div class="big" style="font-size:15px">${money(BANK*f)}<small>${(f*100).toFixed(1)}%</small></div></div>`}).join('');
-  return `<div class="eyebrow">Private · remove before publishing</div><h1 class="h1">Bets · Round 6</h1>
+  return `<h1 class="h1">Bets · Round 6</h1>
   <p class="sub">${B.rules}. Moneylines are draw-no-bet. Stakes are ⅛ Kelly (Lean: 1/16). Lines: ${B.lines}; recheck once final team sheets are confirmed.</p>
   <div class="card bank"><label for="bank">Bankroll</label><input id="bank" type="number" inputmode="decimal" min="0" step="50" value="${BANK}"></div>
   <div class="grid">${cards}</div>
@@ -322,7 +325,8 @@ function bets(){
   <div class="list">${tries}</div>
   <div class="card rules" style="margin-top:12px">Exposure: Australia −5.5 and any Australian try scorer are mostly the same bet. Size them as one position. Track every bet in the odds log so the model can be graded against the closing line.</div>`;
 }
-const VIEWS={'bets':bets,'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'rankings':rankings,'tables':tables,'method':method};
+const VIEWS={'projections':projections,'try-scorers':tryScorers,'ratings':ratings,'player-grades':grades,'rankings':rankings,'tables':tables,'method':method};
+if(D.betsTab) VIEWS.bets=bets;   // no betsTab on the public build - '#bets' falls back to projections below
 function render(){
   const v=(location.hash||'#projections').slice(1), view=VIEWS[v]?v:'projections';
   document.getElementById('main').innerHTML=VIEWS[view]();

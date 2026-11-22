@@ -35,6 +35,8 @@ Sanity check first: `cd model && python3 verify_site.py` → 23/23 pass.
   `build_site.py` (repo root: `python3 build_site.py`) - writes BOTH `site/gainline.html` and the repo-root
   `index.html` (what GitHub Pages actually serves, live at https://whyy-it.github.io/gainline/) so they can't
   drift out of sync. Always run this after `produce.py`, never hand-edit either HTML file.
+  `build_site.py` also writes `site/gainline_private.html` - gitignored, local-only, the one place that
+  carries the Bets tab (see hard rule above; `model/site.json` itself is gitignored too, for the same reason).
 - `bt_sr/` — first real-odds backtest (see below).
 
 ## Current models (out-of-sample)

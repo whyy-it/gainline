@@ -10,7 +10,10 @@ name: Sync player stats
 
 on:
   schedule:
-    - cron: '0 6 * * *'
+    # Off the top of the hour on purpose - every repo whose owner picked a round "6am" cron also lands on
+    # 0 6 * * *, so GitHub's shared scheduler queue is busiest exactly there. An odd minute avoids that
+    # pileup (found 22 Nov: the first real run fired at 13:51 UTC instead of 06:00 - a ~8h delay).
+    - cron: '17 6 * * *'
   workflow_dispatch: {}
 
 permissions:

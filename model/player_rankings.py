@@ -68,7 +68,6 @@ def rank(p, bucket, days=365, min_games=MIN_GAMES):
     return g.sort_values('rate', ascending=False)
 
 LEAGUE_LABEL = {'French Top 14': 'Top 14', 'Gallagher Premiership': 'Prem', 'United Rugby Championship': 'URC'}
-ALLTIME_MIN_GAMES = 15   # higher floor for a career stat than the 5-game "current form" bar
 
 def _format(R):
     return [dict(grp=r.grp, pos=r.grp.replace('_', ' '), name=r['name'], team=r.team, n=int(r.n),
@@ -78,16 +77,18 @@ def _format(R):
 def site_rankings():
     """Scoped to the competitions the rest of the site already tracks (Country/Top14/Prem/URC) rather than
     every league in the data (Pro D2, Japan League One, Mitre 10 Cup, etc. are out of scope for this site).
-    Two windows: 'current' (last 365 days of data, min 5 games - current form) and 'alltime' (every game since
-    the data starts 2022-01-01, min 15 games - there's no history before 2022 to call this truly all-time)."""
+    "Current form": last 365 days of data, min 5 games.
+    There used to also be an "all-time (since 2022)" window - removed 23 Nov. Checked the raw vendored player
+    data directly (not just our own pipeline): 2022-01-01 is the genuine floor across every one of its 9,241
+    player files, not a limit in how we built player_stats.parquet - structured player-level rugby stats just
+    don't exist publicly further back than that. ~4 years isn't meaningfully "all-time" for a career stat, so
+    rather than keep a misleadingly-named window, it's gone; "current form" is the only view now."""
     p, _ = load_graded()
-    out = {'current': {}, 'alltime': {}}
-    for window, days, mg in (('current', 365, MIN_GAMES), ('alltime', None, ALLTIME_MIN_GAMES)):
-        R_country = rank(p, 'country', days=days, min_games=mg)
-        R_club = rank(p, 'club', days=days, min_games=mg)
-        out[window]['Country'] = _format(R_country)
-        for full, label in LEAGUE_LABEL.items():
-            out[window][label] = _format(R_club[R_club.league == full])
+    R_country = rank(p, 'country')
+    R_club = rank(p, 'club')
+    out = {'Country': _format(R_country)}
+    for full, label in LEAGUE_LABEL.items():
+        out[label] = _format(R_club[R_club.league == full])
     return out
 
 if __name__ == '__main__':

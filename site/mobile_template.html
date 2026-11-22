@@ -149,7 +149,7 @@ const fav = (h,a,line) => line<=0 ? `${CODE[h]||h} −${half(line)}` : `${CODE[a
 document.getElementById('upd').textContent = 'Updated ' + D.updated;
 // ko_utc is a real UTC instant straight from ESPN (auto_rounds.py); render it in each viewer's own device
 // timezone/locale instead, so kickoff shows correctly no matter where the page is opened.
-const koLocal = m => new Date(m.ko_utc).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'});
+const koLocal = m => new Date(m.ko_utc).toLocaleString([], {weekday:'short', day:'numeric', month:'short', hour:'numeric', minute:'2-digit'});
 
 /* ---- Live scores / live win probability / live player stats ----------------------------------------
 Client-side polling, like the ESPN app's gamecast - no backend, because both APIs send
@@ -393,23 +393,19 @@ function grades(){
   <div class="list">${rows}</div>`;
 }
 
-let rkLg='Country', rkWin='current';
+let rkLg='Country';
 function rankings(){
-  const cats=Object.keys(D.rankings.current);
-  const list=[...D.rankings[rkWin][rkLg]].sort((a,b)=>b.grade-a.grade);
+  const cats=Object.keys(D.rankings);
+  const list=[...D.rankings[rkLg]].sort((a,b)=>b.grade-a.grade);
   const isCountry=rkLg==='Country';
   const rows=list.map((r,i)=>`<div class="row gd"><div class="grade" style="background:${gcol(r.grade)}">${r.grade}</div>
     <div><div class="t1">${i+1}. ${r.name}</div><div class="t2">${isCountry?flag(r.team,11):badge(r.team,14)} <span style="text-transform:capitalize">${r.team} · ${r.pos}</span> · ${r.n} games</div></div>
     <div class="big" style="font-size:17px">${r.rate>0?'+':''}${r.rate.toFixed(1)}<small>pts/gm</small></div></div>`).join('');
   return `<h1 class="h1">Player rankings</h1>
   <p class="sub">Shrunk points added per game, ranked within position (and within league for clubs - a Top 14 prop isn't judged against a Premiership prop).</p>
-  <div class="filters" role="group" aria-label="Window">
-    <button type="button" aria-pressed="${rkWin==='current'}" data-rkwin="current">Current form</button>
-    <button type="button" aria-pressed="${rkWin==='alltime'}" data-rkwin="alltime">All-time (since 2022)</button>
-  </div>
   <div class="filters" role="group" aria-label="Competition">${cats.map(c=>`<button type="button" aria-pressed="${c===rkLg}" data-rklg="${c}">${c}</button>`).join('')}</div>
   <div class="list">${rows}</div>
-  <p class="note">${rkWin==='current'?'Last 365 days of data, min 5 games.':'Every game since the data starts (2022), min 15 games - not truly all-time, just as far back as the data goes.'} ${isCountry?'Tier-1 nations only, pooled across all Tests.':'One league at a time: a prop’s rate isn’t compared across leagues of different strength.'}</p>`;
+  <p class="note">Last 365 days of data, min 5 games. ${isCountry?'Tier-1 nations only, pooled across all Tests.':'One league at a time: a prop’s rate isn’t compared across leagues of different strength.'}</p>`;
 }
 
 let tblComp='Nations Championship';
@@ -497,7 +493,7 @@ function render(){
 }
 document.getElementById('main').addEventListener('change',e=>{if(e.target.id==='bank'){BANK=Math.max(0,+e.target.value||0);try{localStorage.setItem('gl_bank',BANK);}catch(_){}render();}});
 document.getElementById('main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; if(b.dataset.rklg)rkLg=b.dataset.rklg; if(b.dataset.rkwin)rkWin=b.dataset.rkwin; if(b.dataset.tbl)tblComp=b.dataset.tbl; render();});
+  if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; if(b.dataset.rklg)rkLg=b.dataset.rklg; if(b.dataset.tbl)tblComp=b.dataset.tbl; render();});
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0);});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);
 new MutationObserver(render).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});

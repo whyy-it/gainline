@@ -876,3 +876,19 @@ the real score on a completely fresh page load with no client poll involved. Cau
 zero-division fair-odds bug in verify_site.py itself this surfaced (a certain 100%/0% outcome breaks the
 naive `1/p_home` re-derivation) and a stale expected-team-count check (try-scorer team count needs to exclude
 matches already final, same as produce.py does). 26/26 checks pass on the real (non-synthetic) data.
+
+## Match cards show the actual date; removed the "all-time" rankings window
+Added the date (not just weekday + time) to each match card's kickoff badge - with multiple competitions on
+screen at once since 22 Nov, "Fri" alone is ambiguous once two different Fridays are both visible.
+
+Separately asked whether Rankings' "All-time (since 2022)" window could be extended back 30-40 years, or
+should be removed. Checked the actual data before answering either way, not just our own pipeline: read
+every one of the 9,241 player files in the raw vendored `seanyboi/rugbydata` source directly (not just what's
+already loaded into player_stats.parquet) and confirmed 2022-01-01 is the genuine floor - not a limit in how
+we built the pipeline, but how far back structured player-level rugby stats (tackles, carries, etc.) exist in
+any publicly available form at all. 30-40 years isn't achievable with any source found. Removed the window
+entirely (player_rankings.py's `site_rankings()` now returns one flat set of leagues instead of nested
+current/alltime dicts; the template's window-toggle filter is gone) rather than keep a feature that can only
+ever cover ~4-5 years under a name that implies far more, even with the "(since 2022)" caveat already there.
+"Current form" (365 days, min 5 games) is the only Rankings view now. verify_site.py/the rest of the pipeline
+needed no changes - confirmed via produce.py/build_site.py/verify_site.py (26/26) and in-browser.

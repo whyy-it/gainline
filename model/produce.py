@@ -88,6 +88,24 @@ def project(home, away, competition, kind, fit):
         row.update(mkt_home=None, mkt_away=None, mkt_spread=None, mdh=None, mda=None, p_cover_home=None)
     return row, mg
 
+def amer_safe(p):
+    """Same odds conversion as amer(), clipped away from exactly 0/1 first - a just-finished match's real
+    win probability IS exactly 1/0/0.5, and amer(1/0) or amer(1/1) both blow up (division by zero)."""
+    return amer(1 / min(max(p, 1e-4), 1 - 1e-4))
+
+def apply_final(row, m):
+    """Bakes a confirmed-final result straight into site.json (23 Nov - see auto_rounds.py's docstring for
+    why: a client-side-only "final" state silently reverted to the stale pre-match projection once the live
+    poller's window closed and no visitor's browser had polled ESPN in time to catch it). Once ESPN confirms
+    a match is over, this OVERWRITES the model's projection with the real score/outcome - the published page
+    shows the actual result from here on, not a forecast, until auto_rounds.py retires this match from the
+    active window entirely."""
+    if 'final_home' not in m: return row
+    hs, as_ = m['final_home'], m['final_away']
+    p_home = 1.0 if hs > as_ else (0.0 if hs < as_ else 0.5)
+    return dict(row, final=True, proj_home=int(hs), proj_away=int(as_), p_home=p_home, p_away=1 - p_home,
+               p_draw=1.0 if hs == as_ else 0.0, fair_home=amer_safe(p_home), fair_away=amer_safe(1 - p_home))
+
 def club_ratings():
     C = G[G.kind == 'club'].reset_index(drop=True)
     _, R = elo(C, 'club', 0.06, 5, 40, 0.2, hfa_map=CHFA, sa_bonus=1.0)
@@ -170,9 +188,11 @@ def main():
         matches = []
         for m in r['matches']:
             proj, mg = project(m['home'], m['away'], r['competition'], r['kind'], f)
+            proj = apply_final(proj, m)
             matches.append(dict(home=m['home'], away=m['away'], venue=m['venue'], ko_utc=m['ko_utc'],
                                 competition=r['competition'], **proj))
-            if r['kind'] == 'intl': intl_for_tries.append((m['home'], m['away'], mg, proj['total']))
+            # a match that's already finished doesn't need try-scorer props computed for it
+            if r['kind'] == 'intl' and not proj.get('final'): intl_for_tries.append((m['home'], m['away'], mg, proj['total']))
         rounds.append(dict(competition=r['competition'], round_label=r['round_label'], kind=r['kind'], matches=matches))
 
     R_intl = fit['intl']['R'] if need_intl else {}

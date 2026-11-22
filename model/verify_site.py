@@ -59,13 +59,26 @@ check('Test ratings match an independent re-implementation', mx < 0.02, f'max di
 # would just duplicate features.club_state()/league_sim.py rather than independently verify them.
 w = d.get('probit')
 all_matches = [(rnd, mt) for rnd in d['rounds'] for mt in rnd['matches']]
+def fair_odds(p):   # same clipping as produce.py's amer_safe - a final match's p_home is exactly 1/0/0.5
+    p = min(max(p, 1e-4), 1 - 1e-4); fh = 1 / p
+    return f'+{round((fh-1)*100)}' if fh >= 2 else f'{round(-100/(fh-1))}'
+
 for rnd, mt in all_matches:
     h, a = mt['home'], mt['away']
     ok = abs(mt['p_home'] + mt['p_draw'] + mt['p_away'] - 1) < 1e-9
-    ok &= mt['proj_home'] == round((mt['total'] - mt['spread']) / 2) and mt['proj_away'] == round((mt['total'] + mt['spread']) / 2)
-    fh = 1 / mt['p_home']; fair = f'+{round((fh-1)*100)}' if fh >= 2 else f'{round(-100/(fh-1))}'
-    ok &= fair == mt['fair_home']
     ok &= pd.Timestamp(mt['ko_utc']).tzinfo is not None   # a real, timezone-aware instant (ESPN's own date field)
+    if mt.get('final'):
+        # apply_final() (produce.py, 23 Nov) overwrites proj_home/away with the REAL score once ESPN confirms
+        # a match is over - the pre-match total/spread derivation and fair-odds-from-model-prob checks below
+        # don't apply anymore, so check the final-specific invariant instead: the embedded result is self-
+        # consistent (win/loss/draw correctly reflected, fair odds correctly derived from the now-certain prob).
+        hs, as_ = mt['proj_home'], mt['proj_away']
+        ok &= (mt['p_home'] == 1.0 if hs > as_ else (mt['p_home'] == 0.0 if hs < as_ else mt['p_home'] == 0.5))
+        ok &= fair_odds(mt['p_home']) == mt['fair_home'] and fair_odds(mt['p_away']) == mt['fair_away']
+        check(f"Match card {h} v {a} ({rnd['competition']}) - final result baked in correctly", bool(ok))
+        continue
+    ok &= mt['proj_home'] == round((mt['total'] - mt['spread']) / 2) and mt['proj_away'] == round((mt['total'] + mt['spread']) / 2)
+    ok &= fair_odds(mt['p_home']) == mt['fair_home']
     if mt['mkt_spread'] is not None:   # only present when round_config.MKT has a board for this match
         sigma = w['sigma'] if rnd['kind'] == 'intl' else club_sigma()
         pc = 1 - norm.cdf(-mt['mkt_spread'], -mt['spread'], sigma)
@@ -105,6 +118,8 @@ for t in d['tries']:
 check('Try probabilities in range, odds consistent', bool(ok))
 n_intl_teams = sum(2 * len(rnd['matches']) for rnd in d['rounds'] if rnd['kind'] == 'intl')   # try scorer is
 # Test-only (no club equivalent, see CLAUDE.md) - 0 when no intl round is active, which is fine, not a bug
+n_intl_teams -= sum(2 for rnd in d['rounds'] if rnd['kind'] == 'intl' for mt in rnd['matches'] if mt.get('final'))
+# a match already confirmed final (23 Nov) correctly gets no try-scorer props computed for it - see produce.py
 if n_intl_teams:
     check(f'Try scorers for all {n_intl_teams} teams this round', len(set(t['team'] for t in d['tries'])) == n_intl_teams)
     tt = pd.DataFrame(d['tries']).groupby('team').p.sum()

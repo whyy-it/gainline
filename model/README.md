@@ -839,3 +839,40 @@ Tested end-to-end against real auto-detected fixtures throughout, not just unit-
 (Nations Championship Round 7, 6 matches; French Top 14, 7 matches) while building this, confirmed 13
 sensible, independently-checked match cards across both competitions and multi-league live-poll dispatch
 working correctly (verified against ESPN's real feed, not mocked). 26/26 checks pass.
+
+## Real cold-start bug caught on the FIRST live CI run of the new automated rebuild
+model/site.json is gitignored (it carries betsTab - see 22 Nov), so a genuinely fresh checkout - a new clone,
+or this exact case, the first time GitHub Actions ever ran the rebuilt "Rebuild site" workflow - has no
+site.json file at all. produce.py's `d = json.load(open(OUT))` assumed one already existed (to preserve
+hand-maintained bets text across runs); crashed immediately in CI with FileNotFoundError. Fixed by falling
+back to `{}` - bets.build() always rewrites betsTab from scratch anyway, so there's nothing real to "keep" on
+a true first run. Verified by actually deleting site.json locally and re-running the full pipeline (not just
+reasoning about it), then re-triggered the real CI workflow, which completed successfully and auto-committed
+on its own.
+
+## Final results now stick - baked server-side, not left to a visitor's browser catching it
+Asked for games to "show as final... until the next round is ready to view." They were already going final
+in the live score poller client-side, but ONLY in that one visitor's browser, for a limited window (gave up
+polling 24h after kickoff) - meaning a match that finished with nobody's tab open to catch it would silently
+flip BACK to showing the stale pre-match projection on the next fresh visit, since nothing ever recorded the
+real result anywhere durable. "Final" was never actually a property of the published page, just an ephemeral
+client-side cache.
+Fixed at the root: auto_rounds.py now carries each match's confirmed final score straight from ESPN (it was
+already fetching `status` per match, just discarding it beyond filtering out postponed/cancelled games), and
+produce.py's new `apply_final()` overwrites the match's projection with the real result (score, win%, fair
+odds - clipped away from exactly 0/1 first, same fix verify_site.py's own fair-odds re-derivation needed once
+tested against a real final match) directly into site.json. "Final" is now baked into the daily-rebuilt data
+itself - every visitor sees the real result immediately, with no dependency on live polling at all. The
+client-side poller still runs (for genuinely live in-progress state, minute-by-minute), but now skips any
+match the server has already confirmed final rather than wasting a request re-confirming it.
+Also bumped auto_rounds.py's lookback window 3->6 days: 3 days left a real gap where a just-finished round
+could age out of the detection window before the next round's fixtures were far enough out to be picked up -
+exactly the "nothing scheduled" dead zone this request was trying to avoid between one round and the next.
+Verified with a full integration test, not just the isolated function: temporarily monkey-patched
+auto_rounds.active_rounds() to inject a real final score into the live pipeline, ran produce.py end to end,
+and confirmed (a) the match card correctly showed FT/100%/0% baked into site.json, (b) try-scorer props
+correctly stopped being generated for that match (36 teams -> 30), and (c) the rendered HTML shows "FT" and
+the real score on a completely fresh page load with no client poll involved. Caught and fixed the same
+zero-division fair-odds bug in verify_site.py itself this surfaced (a certain 100%/0% outcome breaks the
+naive `1/p_home` re-derivation) and a stale expected-team-count check (try-scorer team count needs to exclude
+matches already final, same as produce.py does). 26/26 checks pass on the real (non-synthetic) data.

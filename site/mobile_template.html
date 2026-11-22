@@ -241,7 +241,7 @@ async function pollOneLeague(competition, espnLeague, matches){
   // silently stop trying before ever catching a delayed final score, as a first version of this did).
   const inWindow = matches.some(m=>{
     const ko = new Date(m.ko_utc).getTime(), key = m.home+'|'+m.away;
-    return !LIVE[key]?.final && now>=ko-10*60000 && now<=ko+24*3600000;
+    return !m.final && !LIVE[key]?.final && now>=ko-10*60000 && now<=ko+24*3600000;
   });
   if (!inWindow) return false;   // nothing upcoming, in progress, or recently finished-but-unconfirmed here
   try {
@@ -282,7 +282,11 @@ function matchCard(m){
   // have a board (round_config.MKT is an optional manual override); show "-" rather than break on null
   let mh=null, ma=null;
   if (hasMkt){ const ih=1/m.mdh, ia=1/m.mda, s=ih+ia; mh=ih/s; ma=ia/s; }
-  const live = LIVE[m.home+'|'+m.away];
+  // m.final (produce.py, 23 Nov) means the server already confirmed and baked in the real result - treat it
+  // the same as a client-detected live.final so the FT badge/label show even on a first-ever visit, with no
+  // client poll needed. A client-side live poll can still override with a fresher in-progress state.
+  const live = LIVE[m.home+'|'+m.away] || (m.final ? {badge:'FT', hs:m.proj_home, as_:m.proj_away,
+    pHome:m.p_home, pAway:m.p_away, pDraw:m.p_draw, final:true} : null);
   // Live score/win% replace the pre-match projection once a match has kicked off; spread/total stay
   const sHome = live?live.hs:m.proj_home, sAway = live?live.as_:m.proj_away;
   const pHome = live?live.pHome:m.p_home, pAway = live?live.pAway:m.p_away, pDraw = live?live.pDraw:m.p_draw;

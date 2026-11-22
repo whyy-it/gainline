@@ -11,6 +11,13 @@ Sat-only window for every competition tracked here).
 "Round" is a cluster of dates, not a real official round NUMBER - ESPN doesn't expose one reliably enough
 to trust, so round_label is the date range (e.g. "28-29 Nov") rather than "Round 11".
 
+Also carries each match's final score when ESPN confirms it (23 Nov: a round used to only "go final" in the
+visitor's own browser, via the client-side live poller - meaning a match that finished more than 24h ago, with
+no one's tab open to catch it, would silently show the stale PRE-match projection again on the next fresh
+visit, since the poller had given up trying and the server-side rebuild never recorded the real result at
+all). produce.py now bakes a confirmed final result straight into site.json, so "final" is a property of the
+published data itself, not something that depends on a visitor's browser having polled at the right moment.
+
 Reuses club_fixtures.py's ESPN name aliasing (NOT build_data.py's - that one's for World Rugby's different
 naming convention, a different provider with its own quirks)."""
 from datetime import date, datetime, timedelta
@@ -30,9 +37,11 @@ def _fetch_day(league_id, d):
     if r.status_code != 200: return []   # a bad day shouldn't kill the whole pull - just treat it as empty
     return r.json().get('events', [])
 
-def competition_round(comp, days_back=3, days_fwd=10):
-    """One competition's current cluster of fixtures, or None if nothing's on. days_back catches a match
-    that kicked off recently but hasn't been marked final yet (ESPN lag); days_fwd is the lookahead window."""
+def competition_round(comp, days_back=6, days_fwd=10):
+    """One competition's current cluster of fixtures, or None if nothing's on. days_back needs to comfortably
+    bridge from one round finishing to the next one being detected (bumped 3->6 on 23 Nov - 3 days left a
+    real gap where a just-finished round could age out of the window before the next round's fixtures were
+    far enough out to be picked up, showing "nothing scheduled" in between); days_fwd is the lookahead window."""
     today = date.today()
     seen = {}   # keyed by event id - a game can show up on more than one day's query near a UTC date boundary
     for i in range(-days_back, days_fwd + 1):
@@ -51,7 +60,13 @@ def competition_round(comp, days_back=3, days_fwd=10):
             # including ones obviously not played there (Italy v Fiji). Showing a confidently wrong venue is
             # worse than showing none; revisit with a cross-check (e.g. World Rugby's /match venue field,
             # already proven correct in wr_stats_sync.py) if this is wanted later.
-            seen[ev['id']] = dict(home=norm(hn), away=norm(an), venue='', ko_utc=c.get('date'), status=st)
+            row = dict(home=norm(hn), away=norm(an), venue='', ko_utc=c.get('date'), status=st)
+            if st == 'STATUS_FINAL':
+                hs = next((t.get('score') for t in teams if t.get('homeAway') == 'home'), None)
+                as_ = next((t.get('score') for t in teams if t.get('homeAway') == 'away'), None)
+                if hs is not None and as_ is not None:
+                    row['final_home'] = float(hs); row['final_away'] = float(as_)
+            seen[ev['id']] = row
     rows = list(seen.values())
     if not rows: return None
     rows.sort(key=lambda r: r['ko_utc'])

@@ -16,7 +16,8 @@ from v6 import intl_games, elo, probit_fit, season, T1, G, CHFA, score, t1_mask
 import sr as SR
 
 OUT = '../model/site.json'
-from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE, MARKET_DATE, FIX, MKT   # shared with bets.py
+from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE, MARKET_DATE, FIX, MKT, ESPN_LEAGUE_IDS   # shared with bets.py
+from wr_stats_sync import FIELD_MAP   # client needs this to read World Rugby's live per-player stat keys
 HFA_I = 4.0
 _MON = {m: i + 1 for i, m in enumerate(
     ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])}
@@ -147,7 +148,13 @@ def main():
              intl=[dict(team=t, rating=round(float(v), 2)) for t, v in T1L], club=club_ratings(),
              sr=super_rugby(), tries=tries, grades=graded, grades_match=grades_match,
              grade_values={k: round(float(v), 4) for k, v in grade_values.items()}, rankings=rankings,
-             recap=game_recap, standings=standings)
+             recap=game_recap, standings=standings,
+             # Client-side live polling needs these (site/mobile_template.html - CORS is open on both APIs,
+             # confirmed 22 Nov, so the static page fetches live scores/stats itself, no backend needed):
+             # which ESPN scoreboard to poll for this round's matches, and how to read World Rugby's live
+             # per-player stat keys into our schema (same mapping wr_stats_sync.py uses for the post-match sync).
+             live=dict(espn_league=ESPN_LEAGUE_IDS.get(COMPETITION),
+                       wr_field_map={k: FIELD_MAP[k] for k in list(grade_values) + ['points']}))
     d['backtest'].update(live_backtest())
     d['probit'] = dict(a=float(w[0]), b=float(w[1]), sigma=float(1 / w[1]))
     json.dump(d, open(OUT, 'w'), default=float)

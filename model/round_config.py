@@ -20,3 +20,10 @@ MKT = {'Ireland': (4.2, 1e9, 1.2083, 9.5, 1.8929, 1.9259),
        'Italy': (1.4, 1e9, 2.85, -5.5, 1.9434, 1.8621),
        'France': (1.0286, 1e9, 10.8, -19.5, 1.9259, 1.8929),
        'Wales': (2.75, 1e9, 1.4255, 5.5, 1.8929, 1.9259)}
+
+# ESPN league ids this round's live-score/live-winprob poller needs (site/mobile_template.html fetches this
+# directly, client-side - CORS is wide open on site.api.espn.com, confirmed 22 Nov). Keyed by the exact
+# COMPETITION label above. club_fixtures.py has the same ids keyed differently (its own lowercase keys) -
+# kept separate rather than importing, since that file's keys don't match COMPETITION's display strings.
+ESPN_LEAGUE_IDS = {'Nations Championship': '17567', 'Six Nations': '180659', 'French Top 14': '270559',
+                   'Gallagher Premiership': '267979', 'United Rugby Championship': '270557'}

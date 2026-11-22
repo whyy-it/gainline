@@ -65,6 +65,14 @@ for mt in d['matches']:
     check(f'Match card {h} v {a}', bool(ok))
     check(f'  win % ordering matches spread sign ({h})', (mt['p_home'] > mt['p_away']) == (mg > 0))
 
+# 3b. Live-polling config (site/mobile_template.html fetches ESPN/World Rugby directly client-side, 22 Nov -
+# this is the data it needs to find and read them; wrong here means live scores/grades silently never work)
+from round_config import COMPETITION, ESPN_LEAGUE_IDS
+live = d.get('live', {})
+check('Live config: ESPN league id matches round_config', live.get('espn_league') == ESPN_LEAGUE_IDS.get(COMPETITION))
+check('Live config: wr_field_map covers every grade_values stat + points',
+      set(live.get('wr_field_map', {})) == set(d['grade_values']) | {'points'})
+
 # 4. Bets: EV, stakes, rules
 for b in d['betsTab']['bets']:
     nd = b.get('nd', 1.0); ev = nd * (b['blend'] * b['dec'] - 1); qk = nd * max((b['blend'] * (b['dec'] - 1) - (1 - b['blend'])) / (b['dec'] - 1), 0) / 4

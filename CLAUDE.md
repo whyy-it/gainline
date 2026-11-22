@@ -75,6 +75,9 @@ Model Brier 0.1878 vs market **0.1828**; blend 0.1832 (model adds nothing). Bets
 
 ## Open items
 - About 10 Prem 2025–26 games are missing from the source.
-- Player data now runs through 21 Nov 2026 via World Rugby's Pulse API (`wr_stats_sync.py` + `wr_stats_merge.py`,
-  see README) — minutes-played exists for these rows only; still run by hand, not scheduled.
+- Player data (World Rugby Pulse API, `wr_stats_sync.py` + `wr_stats_merge.py`, see README) is synced daily via
+  `.github/workflows/sync_player_stats.yml` — minutes-played exists for these rows only.
 - Bets tab on the site uses Wyatt's PA-book board from 18 Nov (prices in `bets.py` MKT, decimal).
+- The site now polls ESPN/World Rugby directly client-side for live scores, live win%, and live player grades
+  during a match (see README, 22 Nov) — live win% is a principled approximation, not a backtested model (no
+  play-by-play history to validate against); whether live grades populate before full-time is untested.

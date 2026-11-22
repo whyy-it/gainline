@@ -152,20 +152,139 @@ document.getElementById('upd').textContent = 'Updated ' + D.updated;
 const koLocal = m => m.ko_utc ? new Date(m.ko_utc).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'})
                                : `${D.round_date.split(' ')[0]} ${m.ko}`;   // fallback if ko_utc is ever missing
 
+/* ---- Live scores / live win probability / live player stats ----------------------------------------
+Client-side polling, like the ESPN app's gamecast - no backend, because both APIs send
+access-control-allow-origin: * (confirmed 22 Nov) so the static page can fetch them directly.
+ESPN (site.api.espn.com) gives live score/clock/status - reliable, this is exactly what its own app uses.
+World Rugby (api.wr-rims-prod.pulselive.com) gives per-player box-score stats, but ONLY CONFIRMED working
+for completed matches (see model/README.md's validation) - whether it populates anything mid-match is
+untested (no live match was available to check while building this), so the live-grades section may simply
+stay empty until full-time even while scores/win% update throughout. That's a data-availability gap, not a
+bug: the code path is correct either way.
+Live win probability has no historical play-by-play data to backtest against (games.parquet only has final
+scores), so it's not validated the way every other model in this project is - it's a principled approximation
+(a "Brownian bridge": treat the pre-match-expected margin as a drift target and remaining time as shrinking
+uncertainty around it), not a fitted model. Documented here rather than overclaiming it in the UI. */
+const LIVE = {}, LIVE_PLAYERS = {};
+function erf(x){ const s=x<0?-1:1; x=Math.abs(x);
+  const a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  const t=1/(1+p*x); return s*(1-(((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x)); }
+const normCdf = z => 0.5*(1+erf(z/Math.SQRT2));
+function liveWinProb(mg,sigma,elapsedMin,hs,as_){
+  const r = 1 - Math.min(Math.max(elapsedMin/80,0),1), d = hs-as_;
+  if (r < 0.01) return d>0 ? 0.99 : (d<0 ? 0.01 : 0.5);   // essentially full time - avoid dividing by ~0
+  return normCdf((d + mg*r)/(sigma*Math.sqrt(r)));
+}
+const normName = s => (s||'').toLowerCase().trim();
+function findEspnComp(events, home, away){
+  for (const ev of events||[]){
+    const comp = ev.competitions?.[0]; if(!comp) continue;
+    const names = (comp.competitors||[]).map(c=>normName(c.team?.displayName));
+    if (names.includes(normName(home)) && names.includes(normName(away))) return comp;
+  }
+  return null;
+}
+function liveState(m, comp){
+  if (!comp) return null;
+  const st = comp.status?.type?.name;
+  if (!st || st==='STATUS_SCHEDULED' || st==='STATUS_POSTPONED' || st==='STATUS_CANCELED') return null;
+  const home = comp.competitors.find(c=>c.homeAway==='home'), away = comp.competitors.find(c=>c.homeAway==='away');
+  const hs = +home.score, as_ = +away.score;
+  if (st === 'STATUS_FINAL'){
+    const pHome = hs>as_?1:(hs<as_?0:0.5);
+    return {badge:'FT', hs, as_, pHome, pAway:1-pHome, pDraw:hs===as_?1:0, final:true};
+  }
+  const period = comp.status.period||1, clockSecs = comp.status.clock||0;
+  // ESPN may report the 2nd-half clock continuing from ~2400s or restarting at 0 - handle both (untested
+  // against a real live match while building this; see block comment above)
+  const totalSecs = (period>=2 && clockSecs<2400) ? clockSecs+2400 : clockSecs;
+  const elapsed = st==='STATUS_HALFTIME' ? 40 : Math.min(totalSecs/60, 80);
+  const mg = -m.spread, pHome = liveWinProb(mg, D.probit.sigma, elapsed, hs, as_);
+  const badge = st==='STATUS_HALFTIME' ? 'HT' : `LIVE ${Math.round(elapsed)}'`;
+  return {badge, hs, as_, pHome, pAway:1-pHome, pDraw:0, final:false};
+}
+async function pollLivePlayers(m, comp){
+  const key = m.home+'|'+m.away;
+  if (!D.live?.wr_field_map || LIVE_PLAYERS[key+'_busy']) return;
+  LIVE_PLAYERS[key+'_busy'] = true;
+  try {
+    const day = (m.ko_utc||'').slice(0,10);
+    const lr = await fetch(`https://api.wr-rims-prod.pulselive.com/rugby/v3/match?sort=asc&pageSize=100&page=0&startDate=${day}&endDate=${day}`);
+    const lj = await lr.json();
+    const wrMatch = (lj.content||[]).find(x=>{
+      const names = (x.teams||[]).map(t=>normName(t.name));
+      return names.includes(normName(m.home)) && names.includes(normName(m.away));
+    });
+    if (!wrMatch) return;   // not in World Rugby's feed (yet, or ever, for a minor fixture) - nothing to show
+    const sr = await fetch(`https://api.wr-rims-prod.pulselive.com/rugby/v3/match/${wrMatch.matchId}/stats`);
+    const sd = await sr.json();
+    const teamName = {}; (sd.match?.teams||[]).forEach(t=>teamName[t.id]=t.name);
+    const rows = [];
+    for (const ts of sd.teamStats||[]){
+      for (const p of ts.playerStats||[]){
+        if (p.positionLabel==='Head Coach' || p.number==null) continue;
+        const s = p.stats||{};
+        let pa = 0.5*(s[D.live.wr_field_map.points]||0);
+        for (const [field,wrKey] of Object.entries(D.live.wr_field_map)) if (field!=='points') pa += (s[wrKey]||0)*(D.grade_values[field]||0);
+        rows.push({name:p.player.name.display, team:teamName[ts.teamId]||m.home, pa, minutes:s.MinutesPlayedTotal||0});
+      }
+    }
+    if (rows.length) LIVE_PLAYERS[key] = rows.sort((a,b)=>b.pa-a.pa);
+  } catch(e){ /* WR may simply have nothing yet for an in-progress match - leave prior state, try again next tick */ }
+  finally { LIVE_PLAYERS[key+'_busy'] = false; }
+}
+async function pollLive(){
+  if (!D.live?.espn_league || !D.matches?.length) return;
+  const now = Date.now();
+  // Poll from 10min before kickoff until a match is confirmed final, capped at 24h after kickoff (generous
+  // margin for a long game or a slow ESPN update - not a fixed "normal game length" window, which would
+  // silently stop trying before ever catching a delayed final score, as a first version of this did).
+  const inWindow = D.matches.some(m=>{
+    const ko = new Date(m.ko_utc).getTime(), key = m.home+'|'+m.away;
+    return !LIVE[key]?.final && now>=ko-10*60000 && now<=ko+24*3600000;
+  });
+  if (!inWindow) return;   // nothing upcoming, in progress, or recently finished-but-unconfirmed - skip the network call
+  try {
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/rugby/${D.live.espn_league}/scoreboard`);
+    const j = await r.json();
+    let changed = false;
+    for (const m of D.matches){
+      const comp = findEspnComp(j.events, m.home, m.away);
+      const st = liveState(m, comp), key = m.home+'|'+m.away, prevStr = JSON.stringify(LIVE[key]);
+      if (JSON.stringify(st) !== prevStr){ LIVE[key]=st; changed=true; }
+      if (st && !st.final) pollLivePlayers(m, comp);   // fire-and-forget, independent cadence from the main loop
+    }
+    if (changed) render();   // not gated on tab visibility - rendering a hidden tab is cheap, and gating it
+    // meant a tab backgrounded mid-poll could come back to a stale DOM with no further change to trigger a redraw
+  } catch(e){ /* a dropped poll just means next tick retries - never break the page over a flaky fetch */ }
+}
+pollLive();
+let liveTimer = setInterval(pollLive, 25000);
+document.addEventListener('visibilitychange', ()=>{
+  if (document.visibilityState==='visible'){ pollLive(); if(!liveTimer) liveTimer=setInterval(pollLive,25000); }
+  else { clearInterval(liveTimer); liveTimer=null; }   // stop polling in the background - save battery/bandwidth
+});
+/* ---- end live section ---- */
+
 function matchCard(m){
   const [hc,ac] = pairCols(m.home,m.away);
   const ih=1/m.mdh, ia=1/m.mda, s=ih+ia, mh=ih/s, ma=ia/s;
-  const hf = m.p_home>=m.p_away;
+  const live = LIVE[m.home+'|'+m.away];
+  // Live score/win% replace the pre-match projection once a match has kicked off; spread/total stay
+  const sHome = live?live.hs:m.proj_home, sAway = live?live.as_:m.proj_away;
+  const pHome = live?live.pHome:m.p_home, pAway = live?live.pAway:m.p_away, pDraw = live?live.pDraw:m.p_draw;
+  const hf = pHome>=pAway;
   const readable = c => { const [r,g,b]=rgb(c); return (0.299*r+0.587*g+0.114*b)>150 || (isDark() && (0.299*r+0.587*g+0.114*b)<60) ? 'var(--ink)' : c; };
   const tr = (t,sc,p,c,isFav)=>`<div class="trow${isFav?' fav':''}" style="--c:${readable(c)}">${flag(t,18)}<div class="nm">${t}</div><div class="sc">${sc}</div><div class="wp">${pct(p)}</div></div>`;
+  const badge = live ? `<span style="color:${live.final?'var(--muted)':'var(--accent)'};font-weight:700">${live.badge}</span>` : `<span>${koLocal(m)}</span>`;
   return `<article class="card">
-    <div class="m-top"><span>${m.venue}</span><span>${koLocal(m)}</span></div>
-    <div class="m-teams">${tr(m.home,m.proj_home,m.p_home,hc,hf)}${tr(m.away,m.proj_away,m.p_away,ac,!hf)}</div>
-    <div class="bar" role="img" aria-label="${m.home} ${pct(m.p_home)}, draw ${pct(m.p_draw)}, ${m.away} ${pct(m.p_away)}"><i style="width:${m.p_home*100}%;background:${hc}"></i><i style="width:${m.p_draw*100}%;background:var(--draw)"></i><i style="width:${m.p_away*100}%;background:${ac}"></i></div>
-    <div class="drawl"><span>Projected score · win chance</span><span>Draw ${pct(m.p_draw)}</span></div>
+    <div class="m-top"><span>${m.venue}</span>${badge}</div>
+    <div class="m-teams">${tr(m.home,sHome,pHome,hc,hf)}${tr(m.away,sAway,pAway,ac,!hf)}</div>
+    <div class="bar" role="img" aria-label="${m.home} ${pct(pHome)}, draw ${pct(pDraw)}, ${m.away} ${pct(pAway)}"><i style="width:${pHome*100}%;background:${hc}"></i><i style="width:${pDraw*100}%;background:var(--draw)"></i><i style="width:${pAway*100}%;background:${ac}"></i></div>
+    <div class="drawl"><span>${live?(live.final?'Final score · result':'Live score · win chance'):'Projected score · win chance'}</span><span>Draw ${pct(pDraw)}</span></div>
     <div class="vs">
-      <div class="hd"></div><div class="hd r">Gainline</div><div class="hd r">Market</div>
-      <div class="lab">Win</div><div class="r">${pct(m.p_home)} · ${pct(m.p_away)}</div><div class="r">${pct(mh)} · ${pct(ma)}</div>
+      <div class="hd"></div><div class="hd r">Gainline${live&&!live.final?' live':''}</div><div class="hd r">Market</div>
+      <div class="lab">Win</div><div class="r">${pct(pHome)} · ${pct(pAway)}</div><div class="r">${pct(mh)} · ${pct(ma)}</div>
       <div class="lab">Spread</div><div class="r">${fav(m.home,m.away,m.spread)}</div><div class="r">${fav(m.home,m.away,m.mkt_spread)}</div>
       <div class="lab">Total</div><div class="r">${m.total.toFixed(1)}</div><div class="r" style="color:var(--muted)">—</div>
     </div>
@@ -216,6 +335,18 @@ function ratings(){
 }
 const gcol=g=>g>=80?'#16734a':g>=70?'#3f8f63':g>=60?'#7a8f3f':g>=50?'#b9861a':'#b2402f';
 let gTeam='All';
+function liveGradesSection(){
+  // Raw live points-added, not a shrunk/z-scored grade (that needs the full post-match sample) - only shown
+  // while a match is actually in progress; World Rugby may or may not have anything yet (see block comment
+  // near pollLivePlayers), so this quietly stays empty rather than claiming data that isn't there.
+  const inPlay = Object.keys(LIVE).filter(k=>LIVE[k] && !LIVE[k].final && LIVE_PLAYERS[k]?.length);
+  if (!inPlay.length) return '';
+  const rows = inPlay.flatMap(k=>LIVE_PLAYERS[k].slice(0,8)).sort((a,b)=>b.pa-a.pa)
+    .map(p=>`<div class="row gd"><div class="grade" style="background:var(--accent)">${p.minutes}'</div>
+      <div><div class="t1">${p.name}</div><div class="t2">${p.team}</div></div>
+      <div class="big" style="font-size:17px">${p.pa>0?'+':''}${p.pa.toFixed(1)}<small>pts live</small></div></div>`).join('');
+  return `<div class="sec">Live now</div><div class="list" style="margin-bottom:14px">${rows}</div>`;
+}
 function grades(){
   const teams=['All',...new Set(D.grades.map(g=>g.team))];
   const vals=Object.entries(D.grade_values).filter(([k])=>k!=='points').sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
@@ -226,6 +357,7 @@ function grades(){
   const rc=D.recap, hl=rc?.highlights?.map(h=>`<p style="margin:0 0 6px">${h}</p>`).join('')||'';
   return `<h1 class="h1">Player grades</h1>
   <p class="sub">${D.grades_match}. Points added = scoring plus what every other action adds to the margin. Grade ranks it by position across Tests: 60 average, 80+ elite.</p>
+  ${liveGradesSection()}
   ${rc?`<div class="card prose" style="margin-bottom:12px">${hl}</div>`:''}
   <details class="card vals"><summary>What each action is worth</summary><div class="values">${vals}</div></details>
   <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===gTeam}" data-gteam="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>

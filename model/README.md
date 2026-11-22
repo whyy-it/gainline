@@ -705,4 +705,53 @@ Fixed properly rather than just deleting the reminder text:
   the literal old reminder string), and (when gainline_private.html exists locally) it carries betsTab
   correctly.
 Also fixed, same investigation: main's top padding (16px) read as too tight below the sticky nav on every
-tab - bumped to 24px.
+tab - bumped to 24px. That fix itself had a bug: `<main class="wrap" id="main">` meant .wrap (a class
+selector, `padding:0 ... 0 ...`) always beat a bare `main{padding:...}` tag selector on specificity, so the
+padding silently never applied at all - switched the rule to `#main` (ID beats class) once this was caught
+from a follow-up screenshot showing no visible change.
+
+## Live scores, live win probability, live player grades - client-side, no backend
+Asked to make the whole site refresh "every refresh" like ESPN's live gamecast - live score, live win%,
+dynamic grades - not just the daily batch sync. Checked feasibility first rather than assuming a backend
+would be needed: both site.api.espn.com and api.wr-rims-prod.pulselive.com send
+`access-control-allow-origin: *` (confirmed 22 Nov), meaning the static page's own JS can fetch them directly
+from the browser. No proxy, no serverless function, no hosting change - genuinely the same architecture ESPN's
+own app uses, just running client-side against the same public APIs this project already validated server-side.
+
+Built into site/mobile_template.html (produce.py embeds a new `live` block: which ESPN league id to poll,
+and the stat-name mapping needed to read World Rugby's live per-player keys):
+- **Live score/clock/status** - polls ESPN's scoreboard every 25s from 10 min before kickoff until a match is
+  confirmed final (capped at 24h post-kickoff so a stuck/abandoned fixture doesn't poll forever). Matches
+  ESPN's event to our fixture by team name - exact-match is fully reliable for this use (Test matches use
+  plain country names, no club-name aliasing to worry about). Pauses while the tab is backgrounded
+  (visibilitychange), polls once immediately on return. Replaces the pre-match projected score/win% on the
+  Matches tab with the live score/clock and a live win probability once a match starts; once final, shows
+  the real result instead of the projection, permanently (no model, win% becomes 100/0/draw).
+- **Live win probability** - NOT a backtested model like everything else in this project; there's no
+  historical play-by-play data to validate against (games.parquet only has final scores). It's a principled
+  approximation instead: treat the final margin as the pre-match-expected margin (already-validated `spread`)
+  plus Brownian noise scaled by remaining time (`sigma` from the existing probit fit) - i.e. the live margin
+  drifts toward (current margin + pre-match-implied margin for the time left), with uncertainty shrinking as
+  sqrt(time remaining). Smoothly reduces to the ordinary pre-match probability at kickoff and to near-certainty
+  at full time. Documented as an approximation in the code itself, not oversold as validated.
+- **Live player grades** - for any match confirmed in progress, separately polls World Rugby's match list for
+  that day (team-name matched, same approach as wr_stats_sync.py) and, if found, its live per-player stats,
+  computing points-added client-side with the SAME grade_values weights already embedded for the (validated)
+  post-match Grades tab. Important caveat, stated plainly rather than glossed over: whether World Rugby
+  actually populates stats before full-time is UNTESTED - no match was live while this was built. The code
+  path is correct either way (it just stays empty until data shows up), but "live grades" may in practice only
+  ever update at full-time until this gets checked against a real in-progress match.
+Two real bugs caught testing against today's round (useful accident: all 4 remaining fixtures had already
+finished in the real world by the time this was built, e.g. Ireland 20-17 South Africa vs. our stale 23-30
+projection - gave an immediate end-to-end test of the FINAL-score path on real data, not synthetic):
+- First version only polled within a fixed 3.5-hour post-kickoff window - meant a match ESPN was slow to
+  mark final (or that this code checked hours after kickoff, as in testing) would silently stop being polled
+  before ever learning the real result. Changed to "poll until confirmed final, capped at 24h" instead of a
+  fixed game-length guess.
+- First version only called `render()` when `document.visibilityState==='visible'` at poll time - but that
+  can read 'hidden' transiently right after navigation, and more importantly meant a tab that silently updated
+  while backgrounded wouldn't redraw on return unless something ALSO changed on that specific return-triggered
+  poll. Moved the visibility check to the polling cadence itself (pause/resume the interval) and made
+  rendering unconditional on any change - cheap even for a hidden tab, and guarantees the DOM catches up.
+verify_site.py checks the new `live` config block (ESPN league id matches round_config, wr_field_map covers
+every grade_values stat). 26/26 checks pass.

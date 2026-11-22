@@ -7,26 +7,35 @@ Rules
   4. Lines of 20+ points are capped at "Lean" (blowout margins are the model's least reliable area).
   5. Manual flags (documented below) can downgrade a bet to a pass; they never create one.
 Two-way moneylines are draw-no-bet (draw = push).
-Stakes: Bet = 1/2 of quarter-Kelly on the blended probability; Lean = 1/4 of quarter-Kelly."""
-import json, numpy as np
+Stakes: Bet = 1/2 of quarter-Kelly on the blended probability; Lean = 1/4 of quarter-Kelly.
+
+22 Nov: loops over every match in every active round (d['rounds'], not a single flat list - several
+competitions can be live at once now, see produce.py), and simply skips any match with no MKT entry - most
+auto-detected matches won't have one (round_config.py's MKT is an optional, hand-entered override; there's no
+free live odds source), which just means no bet to evaluate there, not an error."""
+import json
 from datetime import date
-from scipy.stats import norm
 
 SITE = '../model/site.json'
-from round_config import MKT   # was a second hardcoded copy here, drifted from produce.py's - see round_config.py
-FLAGS = {}   # was {'England': '...NZ losing to Wales with 10 changes...'} - moot now England's game is final
-            # and out of FIX/MKT (see round_config.py); still here as the place to add a new flag this round.
+from round_config import MKT, MARKET_DATE   # was a second hardcoded MKT copy here, drifted from produce.py's
+FLAGS = {}   # place to downgrade a specific bet to a pass this round, e.g. {'England': 'resting 8 starters'}
 
 def amer(d): return f'+{round((d - 1) * 100)}' if d >= 2 else f'{round(-100 / (d - 1))}'
 def sgn_line(team, x): return f"{team} {'+' if x > 0 else '−'}{abs(x):g}"
 
 def build():
-    d = json.load(open(SITE)); sig = d['probit']['sigma']
+    d = json.load(open(SITE))
     bets, passes = [], []
-    for m in d['matches']:
-        h, a = m['home'], m['away']; o1, ox, o2, ln, oh, oa = MKT[h]; mg = -m['spread']
+    for rnd in d['rounds']:
+      for m in rnd['matches']:
+        h, a = m['home'], m['away']
+        mkt = MKT.get(rnd['competition'], {}).get(h)
+        if mkt is None: continue   # no board for this match - nothing to compare against, not a failure
+        o1, ox, o2, ln, oh, oa = mkt; mg = -m['spread']
         s = 1 / o1 + 1 / ox + 1 / o2; t = 1 / oh + 1 / oa
-        pc = 1 - norm.cdf(-ln, mg, sig)
+        pc = m['p_cover_home']   # already computed in produce.py with the correct per-kind sigma (intl
+        # 13.84 vs club 13.33 - these differ, so recomputing here with a single global sigma would be wrong
+        # for club matches; produce.py only fills this in when MKT exists, which we've already confirmed above
         gap_home = mg - (-ln)                      # >0: model likes home vs the handicap
         cands = [(h, 'ML', f'{h} ML', m['p_home'], (1 / o1) / s, o1, gap_home),
                  (a, 'ML', f'{a} ML', m['p_away'], (1 / o2) / s, o2, -gap_home),
@@ -63,9 +72,9 @@ def build():
         if best['tier'] == 'Lean': best['why'] += ' Lean only: 20+ point lines are where the model is least reliable.'
         bets.append(best)
     tries = [dict(name=t['name'], team=t['team'], p=t['p'], bet_at=t['bet_at']) for t in sorted(d['tries'], key=lambda x: -x['p'])]
-    from round_config import COMPETITION, ROUND_LABEL, ROUND_DATE
-    d['betsTab'] = dict(updated=date.today().strftime('%-d %b'), round=f'{COMPETITION} · {ROUND_LABEL} · {ROUND_DATE}',
-                        lines='Sportingbet board, 17 Nov',
+    round_summary = '; '.join(f"{rnd['competition']} · {rnd['round_label']}" for rnd in d['rounds'])
+    d['betsTab'] = dict(updated=date.today().strftime('%-d %b'), round=round_summary,
+                        lines=f'Manual board, {MARKET_DATE}' if MARKET_DATE else 'No market board entered this round',
                         bets=sorted(bets, key=lambda b: (b['tier'] != 'Bet', -b['ev'])), passes=passes, tries=tries,
                         rules='Blend 50/50 with market · +5% EV floor · moneylines need a 3-pt rating edge · 20+ pt lines capped at Lean')
     json.dump(d, open(SITE, 'w'), default=float)

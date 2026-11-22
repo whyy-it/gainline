@@ -20,14 +20,16 @@ and if no model edge survives, find situational angles that do. Models in scope:
 ## Setup
 `bash setup.sh` (venv, deps, re-clones seanyboi/rugbydata for player data, creates .env). Then put the key in `.env`.
 All scripts run from `model/` (paths are relative: `../data`, `../matches.parquet`).
-Sanity check first: `cd model && python3 verify_site.py` → 23/23 pass.
+Sanity check first: `cd model && python3 verify_site.py` → 26/26 pass.
 
 ## Layout
 - `model/` — everything. Read `model/README.md` first: it is the full decision log (what was tried, kept, rejected, and why).
   - Data: `build_data.py` → `games.parquet` (3,365 games 2018–Nov 2026); pre-match states `SI/SC/SR.parquet`; player data.
   - Tests/clubs: `v6.py` (harness: elo, probit_fit, score), `features.py` (attack/defence → totals), `lineup*.py`.
   - Super Rugby: `sr.py`. Try scorer: `tries.py` (+ `tries_calib.json`). Grades: `grades.py`.
-  - Production: `produce.py` → `site.json`; `bets.py` (Bets tab rules); `verify_site.py` (23 checks).
+  - Production: `produce.py` → `site.json` (`rounds`: one entry per currently-active competition, auto-
+    detected by `auto_rounds.py` from ESPN - no more hand-maintained fixture list, see README 22 Nov);
+    `bets.py` (Bets tab rules, optional per-match market data); `verify_site.py` (26 checks).
   - Odds: `odds_pull.py` (Odds API historical closing lines, cached, `--estimate`, `--budget`) → `odds_hist.csv`;
     `backtest.py` (model vs market, bets rule, bootstrap vs 10% bar, `--books`); `odds_log.csv` + `log_round.py` (forward log).
   - `preds_oos.csv` — 2,320 out-of-sample predictions since 2023 to join to odds.
@@ -75,9 +77,14 @@ Model Brier 0.1878 vs market **0.1828**; blend 0.1832 (model adds nothing). Bets
 
 ## Open items
 - About 10 Prem 2025–26 games are missing from the source.
-- Player data (World Rugby Pulse API, `wr_stats_sync.py` + `wr_stats_merge.py`, see README) is synced daily via
-  `.github/workflows/sync_player_stats.yml` — minutes-played exists for these rows only.
-- Bets tab on the site uses Wyatt's PA-book board from 18 Nov (prices in `bets.py` MKT, decimal).
-- The site now polls ESPN/World Rugby directly client-side for live scores, live win%, and live player grades
+- Player data (World Rugby Pulse API, `wr_stats_sync.py` + `wr_stats_merge.py`, see README) and the Matches
+  tab's fixture list (`auto_rounds.py`, straight from ESPN) are both refreshed automatically via
+  `.github/workflows/sync_player_stats.yml` ("Rebuild site") — minutes-played exists for World Rugby rows only.
+- Match RESULTS (`games.parquet`) stay a manual step via `espn_catchup.py` by design — they feed win
+  probabilities and the Bets tab, meant to be reviewed before they change what every model is built on.
+- `round_config.py`'s `MKT` is an optional, hand-entered market-odds override, nested by competition then
+  team — empty by default (no free live odds source exists). Matches with no entry show "—" for Market and
+  get no bet, not an error.
+- The site polls ESPN/World Rugby directly client-side for live scores, live win%, and live player grades
   during a match (see README, 22 Nov) — live win% is a principled approximation, not a backtested model (no
   play-by-play history to validate against); whether live grades populate before full-time is untested.

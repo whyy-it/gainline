@@ -780,3 +780,62 @@ toward that stable baseline with K pseudo-players. Tried K=10/20/40 against the 
 - K=20/40: over-corrects - both standout performers clip to the 99 ceiling, losing the ability to tell an
   excellent performance from a historically exceptional one.
 K=10 kept. Re-ran produce.py/build_site.py/verify_site.py - 26/26, grades output now matches the table above.
+
+## The scoreboard now updates itself - multi-competition, no more hand-maintained fixture list
+Asked for "ESPN app (live scores, upcoming fixtures) mixed with a 538-style projection system" and,
+specifically, for the Matches tab to stop needing a manual round_config.py edit every week. The 538-style
+piece (team power ratings, Monte Carlo predicted tables/title odds, player rankings) already existed; what
+was actually missing was automatic fixture advancement, so that's what got built.
+
+**New: `model/auto_rounds.py`** detects every tracked competition's current fixtures directly from ESPN,
+replacing round_config.py's hand-maintained FIX list entirely. Two real bugs found building it:
+- A `dates=START-END` range query LOOKS like it works (returns valid JSON, 0 events - easy to misread as
+  "confirmed nothing scheduled") but is actually a silently-swallowed 400 error; only `dates=YYYYMMDD` single
+  days are supported. Caught by checking the status code directly instead of trusting an empty events list -
+  this is exactly the mistake an earlier "no live match right now" finding made.
+- ESPN's `venue` field is wrong for this feed: every Nations Championship fixture that week returned
+  "Allianz Stadium, London" regardless of where it was actually played (confirmed - Italy v Fiji isn't in
+  London). Venue is left blank for auto-detected matches rather than show a confidently wrong one.
+
+**Multi-competition display** (22 Nov, explicit choice over "auto-pick one competition a week" - Top14/Prem/
+URC typically all play the same weekend once the season's underway, so picking only one would hide the
+others): site.json's schema changed from one flat `matches` list + top-level `competition`/`round_label` to
+a `rounds` list, one entry per currently-active competition. The Matches tab renders one section per round.
+
+**Club match projections are new** - produce.py's match-card generator (win%/spread/total) only ever covered
+Tests before (`tests()`, FIX-driven); extended to clubs via league_sim.py's already-validated ratings/sigma
+(Club Brier 0.1725) plus a newly-fit totals model (same polyfit-of-attack+defence-sum recipe Tests already
+use - no club totals calibration existed before this). Checked `features.club_state()`'s from-scratch Elo
+against `v6.elo()`'s independent implementation first (0.0 max diff across 49 teams) before trusting either
+as the ratings source. `league_sim.fit_club_common()` also now returns the probit intercept `a` it was
+fitting but discarding - needed it for a real club win%, not just a Monte Carlo margin draw.
+
+**Market odds remain entirely optional, by necessity** - checked again (ESPN's richer per-event summary
+endpoint too: `hasOdds: false`) and there's still no free live odds source. round_config.py's MKT is now a
+sparse, nested-by-competition manual override; produce.py fills `mkt_*` fields with None when no board
+exists for a match, bets.py skips any match with no entry (not an error, just nothing to compare against),
+and the template shows "-" for the Market column rather than crash on a null. A match's `sigma` now travels
+with it (club 13.33 vs intl 13.84 differ - bets.py was about to reuse a single global sigma for the
+cover-probability calc, which would have been wrong for club matches; fixed by having it just reuse
+produce.py's already-correct `p_cover_home` instead of recomputing).
+
+**Live-score polling now handles several competitions at once** - one ESPN fetch per active competition
+(`D.live.leagues`, not a single league id), each round's matches checked only against their own league's
+scoreboard so two competitions can never cross-match on a shared team name. The live win-probability formula
+now reads each match's own embedded `sigma` instead of a single top-level value, for the same club-vs-intl
+reason as above.
+
+**GitHub Actions workflow restructured** (`.github/workflows/sync_player_stats.yml`, now named "Rebuild
+site"): used to only run produce.py/build_site.py when the player-stats merge found something new. Now
+always runs the full rebuild - a new round appearing is itself a reason to republish, not just new player
+stats - and gates the commit on whether the actual output changed (`git diff --quiet` after rebuilding)
+instead of pre-checking one specific input file. A quiet day (same fixtures, no new stats) is still a clean
+no-op; it just checks after building instead of before.
+
+verify_site.py updated throughout: the Test-specific independent Elo re-derivation stays exactly as rigorous
+as before for intl rounds; club rounds get an internal-consistency check instead (re-deriving club ratings
+from scratch here would just duplicate features.club_state()/league_sim.py, not independently verify them).
+Tested end-to-end against real auto-detected fixtures throughout, not just unit-level: 2 real active rounds
+(Nations Championship Round 7, 6 matches; French Top 14, 7 matches) while building this, confirmed 13
+sensible, independently-checked match cards across both competitions and multi-league live-poll dispatch
+working correctly (verified against ESPN's real feed, not mocked). 26/26 checks pass.

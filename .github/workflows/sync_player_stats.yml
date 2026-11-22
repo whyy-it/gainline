@@ -1,12 +1,14 @@
-name: Sync player stats
+name: Rebuild site
 
-# Daily pull from World Rugby's Pulse API (model/wr_stats_sync.py + wr_stats_merge.py - see model/README.md
-# for how/why this source was chosen and the identity-reconciliation fix it needed). Only touches
-# player_stats.parquet/team_match_stats.parquet (Grades/Rankings/Recap) - match RESULTS stay a manual step
-# via espn_catchup.py by design, since those feed win probabilities and the Bets tab and are meant to be
-# reviewed before they change what every model is built on (see CLAUDE.md/README).
-# Rebuilds and pushes the live site only if verify_site.py's 23 checks all pass; a no-new-matches day (most
-# days, between rounds) is a clean no-op - nothing is committed.
+# Started 21 Nov as just the daily World Rugby player-stats pull; now (22 Nov) runs the FULL rebuild every
+# time, because the Matches tab no longer has a hand-maintained fixture list to gate on - auto_rounds.py
+# detects every tracked competition's current fixtures straight from ESPN each run (see model/README.md,
+# "we need this to update automatically"), so a new round appearing is itself a reason to republish, not
+# just new player stats. Match RESULTS (games.parquet) stay a manual step via espn_catchup.py by design -
+# those feed win probabilities and the Bets tab and are meant to be reviewed before they change what every
+# model is built on (see CLAUDE.md/README).
+# Always computes everything, but only commits/pushes if the output actually changed and verify_site.py's
+# checks all pass - a quiet day (nothing new to sync, same fixtures as last run) is a clean no-op.
 
 on:
   schedule:
@@ -20,7 +22,7 @@ permissions:
   contents: write
 
 jobs:
-  sync:
+  rebuild:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,29 +42,26 @@ jobs:
         working-directory: model
         run: python3 wr_stats_merge.py
 
-      - name: Check whether the merge changed anything
-        id: changed
-        run: |
-          if git diff --quiet -- model/player_stats.parquet model/team_match_stats.parquet; then
-            echo "No new matches today - nothing to rebuild or publish."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Rebuild site.json
-        if: steps.changed.outputs.changed == 'true'
+      - name: Rebuild site.json (auto-detects this week's fixtures + any new player stats)
         working-directory: model
         run: python3 produce.py
 
       - name: Rebuild site/gainline.html + index.html
-        if: steps.changed.outputs.changed == 'true'
         run: python3 build_site.py
 
-      - name: Verify (23/23 checks must pass before anything is published)
-        if: steps.changed.outputs.changed == 'true'
+      - name: Verify (26 checks must pass before anything is published)
         working-directory: model
         run: python3 verify_site.py
+
+      - name: Check whether anything actually changed
+        id: changed
+        run: |
+          if git diff --quiet; then
+            echo "Nothing changed - same fixtures/stats as last run. Nothing to publish."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Commit and push
         if: steps.changed.outputs.changed == 'true'
@@ -70,5 +69,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Automated: sync World Rugby player stats ($(date -u +%Y-%m-%d))"
+          git commit -m "Automated rebuild ($(date -u +%Y-%m-%d))"
           git push origin HEAD:main

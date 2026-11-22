@@ -44,7 +44,9 @@ def fit_club_common():
     pred, _ = elo(C, 'club', 0.06, 5, 40, 0.2, hfa_map=CHFA, sa_bonus=1.0)
     y = (C.hs > C.as_).astype(float).values + 0.5 * (C.hs == C.as_).values
     w = probit_fit(pred, y)
-    return dict(R=R, sigma=1 / w[1])
+    # 'a' (intercept) was fit but discarded here until auto_rounds.py (22 Nov) needed a real club win%, not
+    # just a Monte Carlo margin draw - same probit shape produce.py already uses for Tests (a + b*(mg-0.5))
+    return dict(R=R, sigma=1 / w[1], a=float(w[0]), b=float(w[1]))
 
 def predict_margin(home, away, F_, hfa):
     return F_['R'].get(home, 0) - F_['R'].get(away, 0) + hfa

@@ -12,13 +12,20 @@ def check(name, ok, detail=''):
     print(('PASS ' if ok else 'FAIL ') + name + (f'  [{detail}]' if detail and not ok else ''))
     if not ok: fails.append(name)
 
+_club_sigma = []
+def club_sigma():   # lazy + memoized - only worth the fit cost if a club round actually has a market board
+    if not _club_sigma:
+        import league_sim as LS
+        _club_sigma.append(LS.fit_club_common()['sigma'])
+    return _club_sigma[0]
+
 # 1. Public HTML (what's actually committed/served - CLAUDE.md: "the Bets tab is private") carries every
 # non-betting number from site.json, and genuinely carries NO betting content - not just a hidden tab, the
 # data itself must be absent (see build_site.py, 22 Nov). The private local build, if present, must still
 # carry betsTab correctly - gated separately since it's gitignored and won't exist on a fresh clone.
 m = re.search(r'const D = (\{.*?\});\n', html, re.S)
 emb = json.loads(m.group(1)) if m else None
-check('Public HTML carries matches/tries', emb is not None and emb['matches'] == d['matches'] and emb['tries'] == d['tries'])
+check('Public HTML carries rounds/tries', emb is not None and emb['rounds'] == d['rounds'] and emb['tries'] == d['tries'])
 check('Public HTML has no betting content', emb is not None and 'betsTab' not in emb and 'remove before publishing' not in html.lower())
 priv = pathlib.Path('../site/gainline_private.html')
 if priv.exists():
@@ -46,30 +53,40 @@ site_r = {x['team']: x['rating'] for x in d['intl']}
 mx = max(abs(R[t] - site_r[t]) for t in T1)
 check('Test ratings match an independent re-implementation', mx < 0.02, f'max diff {mx:.3f}')
 
-# 3. Match cards: margins, probabilities, scores, odds
-w = d['probit']
-for mt in d['matches']:
-    h, a = mt['home'], mt['away']; mg = R[h] - R[a] + 4
-    ok = abs(-mt['spread'] - mg) < 0.05
-    ph = norm.cdf(w['a'] + w['b'] * (mg - .5)); pa = 1 - norm.cdf(w['a'] + w['b'] * (mg + .5))
-    ok &= abs(ph - mt['p_home']) < 1e-3 and abs(pa - mt['p_away']) < 1e-3
-    ok &= abs(mt['p_home'] + mt['p_draw'] + mt['p_away'] - 1) < 1e-9
+# 3. Match cards: margins, probabilities, scores, odds. Tests get the full independent re-derivation (the
+# from-scratch Elo loop above); club rounds (22 Nov: several competitions can be active at once, see
+# produce.py) get an internal-consistency check instead - re-deriving club ratings from scratch here too
+# would just duplicate features.club_state()/league_sim.py rather than independently verify them.
+w = d.get('probit')
+all_matches = [(rnd, mt) for rnd in d['rounds'] for mt in rnd['matches']]
+for rnd, mt in all_matches:
+    h, a = mt['home'], mt['away']
+    ok = abs(mt['p_home'] + mt['p_draw'] + mt['p_away'] - 1) < 1e-9
     ok &= mt['proj_home'] == round((mt['total'] - mt['spread']) / 2) and mt['proj_away'] == round((mt['total'] + mt['spread']) / 2)
-    ok &= abs((mt['proj_home'] - mt['proj_away']) - mg) <= 1.01
     fh = 1 / mt['p_home']; fair = f'+{round((fh-1)*100)}' if fh >= 2 else f'{round(-100/(fh-1))}'
     ok &= fair == mt['fair_home']
-    pc = 1 - norm.cdf(-mt['mkt_spread'], mg, w['sigma'])
-    ok &= abs(pc - mt['p_cover_home']) < 1e-3
-    kh, km = map(int, mt['ko'].split()[0].split(':'))   # 'ko' is hand-entered GMT; ko_utc must agree exactly
-    ok &= mt['ko_utc'].endswith('Z') and pd.Timestamp(mt['ko_utc']).hour == kh and pd.Timestamp(mt['ko_utc']).minute == km
-    check(f'Match card {h} v {a}', bool(ok))
-    check(f'  win % ordering matches spread sign ({h})', (mt['p_home'] > mt['p_away']) == (mg > 0))
+    ok &= pd.Timestamp(mt['ko_utc']).tzinfo is not None   # a real, timezone-aware instant (ESPN's own date field)
+    if mt['mkt_spread'] is not None:   # only present when round_config.MKT has a board for this match
+        sigma = w['sigma'] if rnd['kind'] == 'intl' else club_sigma()
+        pc = 1 - norm.cdf(-mt['mkt_spread'], -mt['spread'], sigma)
+        ok &= abs(pc - mt['p_cover_home']) < 1e-3
+    if rnd['kind'] == 'intl':
+        mg = R[h] - R[a] + 4
+        ok &= abs(-mt['spread'] - mg) < 0.05
+        ph = norm.cdf(w['a'] + w['b'] * (mg - .5)); pa = 1 - norm.cdf(w['a'] + w['b'] * (mg + .5))
+        ok &= abs(ph - mt['p_home']) < 1e-3 and abs(pa - mt['p_away']) < 1e-3
+        check(f'  win % ordering matches spread sign ({h})', (mt['p_home'] > mt['p_away']) == (mg > 0))
+    check(f"Match card {h} v {a} ({rnd['competition']})", bool(ok))
 
 # 3b. Live-polling config (site/mobile_template.html fetches ESPN/World Rugby directly client-side, 22 Nov -
 # this is the data it needs to find and read them; wrong here means live scores/grades silently never work)
-from round_config import COMPETITION, ESPN_LEAGUE_IDS
+from round_config import ESPN_LEAGUE_IDS
 live = d.get('live', {})
-check('Live config: ESPN league id matches round_config', live.get('espn_league') == ESPN_LEAGUE_IDS.get(COMPETITION))
+want = {rnd['competition'] for rnd in d['rounds']}
+have = {l['competition'] for l in live.get('leagues', [])}
+check('Live config: one ESPN league entry per active round', want == have, f'{want} vs {have}')
+check('Live config: every league id matches round_config',
+      all(l['espn_league'] == ESPN_LEAGUE_IDS.get(l['competition']) for l in live.get('leagues', [])))
 check('Live config: wr_field_map covers every grade_values stat + points',
       set(live.get('wr_field_map', {})) == set(d['grade_values']) | {'points'})
 
@@ -86,10 +103,14 @@ for t in d['tries']:
     f = 1 / t['p']; s = f'+{round((f-1)*100)}' if f >= 2 else f'{round(-100/(f-1))}'
     ok &= s == t['fair']
 check('Try probabilities in range, odds consistent', bool(ok))
-n_round_teams = 2 * len(d['matches'])   # not hardcoded 12 - FIX shrinks as games finish and get pruned (21 Nov)
-check(f'Try scorers for all {n_round_teams} teams this round', len(set(t['team'] for t in d['tries'])) == n_round_teams)
-tt = pd.DataFrame(d['tries']).groupby('team').p.sum()
-check('No team implausibly loaded (top-3 sum < 1.8)', bool((tt < 1.8).all()), tt.round(2).to_dict())
+n_intl_teams = sum(2 * len(rnd['matches']) for rnd in d['rounds'] if rnd['kind'] == 'intl')   # try scorer is
+# Test-only (no club equivalent, see CLAUDE.md) - 0 when no intl round is active, which is fine, not a bug
+if n_intl_teams:
+    check(f'Try scorers for all {n_intl_teams} teams this round', len(set(t['team'] for t in d['tries'])) == n_intl_teams)
+    tt = pd.DataFrame(d['tries']).groupby('team').p.sum()
+    check('No team implausibly loaded (top-3 sum < 1.8)', bool((tt < 1.8).all()), tt.round(2).to_dict())
+else:
+    check('No intl round active -> tries list correctly empty', len(d['tries']) == 0)
 
 # 6. Ratings tables
 lg = pd.Series([c['league'] for c in d['club']]).value_counts().to_dict()

@@ -1,29 +1,20 @@
-"""Single source of truth for this round's metadata AND fixtures/market board - shared by produce.py
-(Matches/Tries tabs) and bets.py (Bets tab), so there's no second hardcoded copy to drift out of sync.
-Found twice now (21 Nov): the round label/date duplicated separately in the template, then MKT duplicated
-separately in bets.py - same bug class, different files, every time it's two copies instead of one.
-Update ALL of these together each week - when a game in FIX finishes, remove it here (and its MKT entry);
-a "projection" for an already-decided game, using ratings that already absorbed its own result, is
-nonsensical, not just stale (see model/README.md, 21 Nov live-results entry)."""
-COMPETITION = 'Nations Championship'
-ROUND_LABEL = 'Round 6'
-ROUND_DATE = 'Sat 21 Nov'   # see produce.py's note: assumes the whole round is one day
-MARKET_DATE = '18 Nov'
+"""Optional market-odds override, plus the ESPN league ids auto_rounds.py / the live-score poller need.
+Until 22 Nov this also hand-maintained the round's fixture list (COMPETITION/ROUND_LABEL/ROUND_DATE/FIX) -
+that's gone now, replaced by auto_rounds.py detecting fixtures straight from ESPN every run (see
+model/README.md, "we need this to update automatically"). All that's left to maintain by hand is MKT, and
+only when Wyatt actually has a sportsbook board to compare against - there's still no free live odds source
+for rugby (checked again 22 Nov). No board this week = MKT stays empty, the Market column shows "-", and
+bets.py produces no bets for that match - not an error, just nothing to compare.
 
-# England v NZ and Scotland v Japan removed 21 Nov (both finished - England 37-12, Scotland 67-5 - merged
-# into games.parquet via espn_catchup.py). Remaining 4: Ireland-SA/Italy-Fiji were live, France-Argentina/
-# Wales-Australia not yet started, at the time of this edit.
-FIX = [('Ireland', 'South Africa', 'Aviva Stadium', '16:40 GMT'), ('Italy', 'Fiji', 'Udine', '16:40 GMT'),
-       ('France', 'Argentina', 'Stade de France', '20:10 GMT'), ('Wales', 'Australia', 'Principality Stadium', '20:10 GMT')]
-# market board (decimal): 1, X, 2, home handicap, home hcp odds, away hcp odds  -- Sportingbet ZA, 17 Nov
-MKT = {'Ireland': (4.2, 1e9, 1.2083, 9.5, 1.8929, 1.9259),
-       'Italy': (1.4, 1e9, 2.85, -5.5, 1.9434, 1.8621),
-       'France': (1.0286, 1e9, 10.8, -19.5, 1.9259, 1.8929),
-       'Wales': (2.75, 1e9, 1.4255, 5.5, 1.8929, 1.9259)}
+To add a board: nest it by competition, then home team, same 6-tuple as before (decimal 1, X, 2, home
+handicap, home hcp odds, away hcp odds):
+  MKT = {'French Top 14': {'Toulouse': (1.2, 1e9, 4.5, -12.5, 1.9, 1.9), ...}, ...}
+and set MARKET_DATE to when the board was taken (e.g. '27 Nov')."""
+MARKET_DATE = None
+MKT = {}
 
 # ESPN league ids this round's live-score/live-winprob poller needs (site/mobile_template.html fetches this
-# directly, client-side - CORS is wide open on site.api.espn.com, confirmed 22 Nov). Keyed by the exact
-# COMPETITION label above. club_fixtures.py has the same ids keyed differently (its own lowercase keys) -
-# kept separate rather than importing, since that file's keys don't match COMPETITION's display strings.
+# directly, client-side - CORS is wide open on site.api.espn.com, confirmed 22 Nov) AND auto_rounds.py uses
+# to detect each competition's current fixtures. Keyed by our own competition-label convention.
 ESPN_LEAGUE_IDS = {'Nations Championship': '17567', 'Six Nations': '180659', 'French Top 14': '270559',
                    'Gallagher Premiership': '267979', 'United Rugby Championship': '270557'}

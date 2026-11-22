@@ -147,10 +147,9 @@ const CODE={'England':'ENG','New Zealand':'NZ','Scotland':'SCO','Japan':'JPN','I
 const half = x => (Math.round(Math.abs(x)*2)/2).toFixed(1);
 const fav = (h,a,line) => line<=0 ? `${CODE[h]||h} −${half(line)}` : `${CODE[a]||a} −${half(line)}`;  // line = home spread
 document.getElementById('upd').textContent = 'Updated ' + D.updated;
-// ko_utc is a real UTC instant (produce.py); render it in each viewer's own device timezone/locale instead
-// of the hand-entered GMT string, so kickoff shows correctly no matter where the page is opened.
-const koLocal = m => m.ko_utc ? new Date(m.ko_utc).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'})
-                               : `${D.round_date.split(' ')[0]} ${m.ko}`;   // fallback if ko_utc is ever missing
+// ko_utc is a real UTC instant straight from ESPN (auto_rounds.py); render it in each viewer's own device
+// timezone/locale instead, so kickoff shows correctly no matter where the page is opened.
+const koLocal = m => new Date(m.ko_utc).toLocaleString([], {weekday:'short', hour:'numeric', minute:'2-digit'});
 
 /* ---- Live scores / live win probability / live player stats ----------------------------------------
 Client-side polling, like the ESPN app's gamecast - no backend, because both APIs send
@@ -199,7 +198,9 @@ function liveState(m, comp){
   // against a real live match while building this; see block comment above)
   const totalSecs = (period>=2 && clockSecs<2400) ? clockSecs+2400 : clockSecs;
   const elapsed = st==='STATUS_HALFTIME' ? 40 : Math.min(totalSecs/60, 80);
-  const mg = -m.spread, pHome = liveWinProb(mg, D.probit.sigma, elapsed, hs, as_);
+  // m.sigma travels with the match itself (produce.py) - club (13.33) and intl (13.84) sigma differ, and
+  // several competitions can be live at once, so there's no single global sigma to reach for anymore.
+  const mg = -m.spread, pHome = liveWinProb(mg, m.sigma, elapsed, hs, as_);
   const badge = st==='STATUS_HALFTIME' ? 'HT' : `LIVE ${Math.round(elapsed)}'`;
   return {badge, hs, as_, pHome, pAway:1-pHome, pDraw:0, final:false};
 }
@@ -233,30 +234,39 @@ async function pollLivePlayers(m, comp){
   } catch(e){ /* WR may simply have nothing yet for an in-progress match - leave prior state, try again next tick */ }
   finally { LIVE_PLAYERS[key+'_busy'] = false; }
 }
-async function pollLive(){
-  if (!D.live?.espn_league || !D.matches?.length) return;
+async function pollOneLeague(competition, espnLeague, matches){
   const now = Date.now();
   // Poll from 10min before kickoff until a match is confirmed final, capped at 24h after kickoff (generous
   // margin for a long game or a slow ESPN update - not a fixed "normal game length" window, which would
   // silently stop trying before ever catching a delayed final score, as a first version of this did).
-  const inWindow = D.matches.some(m=>{
+  const inWindow = matches.some(m=>{
     const ko = new Date(m.ko_utc).getTime(), key = m.home+'|'+m.away;
     return !LIVE[key]?.final && now>=ko-10*60000 && now<=ko+24*3600000;
   });
-  if (!inWindow) return;   // nothing upcoming, in progress, or recently finished-but-unconfirmed - skip the network call
+  if (!inWindow) return false;   // nothing upcoming, in progress, or recently finished-but-unconfirmed here
   try {
-    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/rugby/${D.live.espn_league}/scoreboard`);
+    const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/rugby/${espnLeague}/scoreboard`);
     const j = await r.json();
     let changed = false;
-    for (const m of D.matches){
+    for (const m of matches){
       const comp = findEspnComp(j.events, m.home, m.away);
       const st = liveState(m, comp), key = m.home+'|'+m.away, prevStr = JSON.stringify(LIVE[key]);
       if (JSON.stringify(st) !== prevStr){ LIVE[key]=st; changed=true; }
       if (st && !st.final) pollLivePlayers(m, comp);   // fire-and-forget, independent cadence from the main loop
     }
-    if (changed) render();   // not gated on tab visibility - rendering a hidden tab is cheap, and gating it
-    // meant a tab backgrounded mid-poll could come back to a stale DOM with no further change to trigger a redraw
-  } catch(e){ /* a dropped poll just means next tick retries - never break the page over a flaky fetch */ }
+    return changed;
+  } catch(e){ return false; }   // a dropped poll just means next tick retries - never break the page over a flaky fetch
+}
+async function pollLive(){
+  if (!D.live?.leagues?.length || !D.rounds?.length) return;
+  // One fetch per active competition (not one global call) - each round's matches only get checked against
+  // their OWN league's scoreboard, so two competitions can never cross-match on a shared team name.
+  const byComp = Object.fromEntries(D.rounds.map(r => [r.competition, r.matches]));
+  const results = await Promise.all(D.live.leagues
+    .filter(l => l.espn_league && byComp[l.competition])
+    .map(l => pollOneLeague(l.competition, l.espn_league, byComp[l.competition])));
+  if (results.some(Boolean)) render();   // not gated on tab visibility - rendering a hidden tab is cheap, and
+  // gating it meant a tab backgrounded mid-poll could come back to a stale DOM with nothing to trigger a redraw
 }
 pollLive();
 let liveTimer = setInterval(pollLive, 25000);
@@ -268,7 +278,10 @@ document.addEventListener('visibilitychange', ()=>{
 
 function matchCard(m){
   const [hc,ac] = pairCols(m.home,m.away);
-  const ih=1/m.mdh, ia=1/m.mda, s=ih+ia, mh=ih/s, ma=ia/s;
+  const hasMkt = m.mdh!=null && m.mda!=null;   // no free live odds source - most auto-detected matches won't
+  // have a board (round_config.MKT is an optional manual override); show "-" rather than break on null
+  let mh=null, ma=null;
+  if (hasMkt){ const ih=1/m.mdh, ia=1/m.mda, s=ih+ia; mh=ih/s; ma=ia/s; }
   const live = LIVE[m.home+'|'+m.away];
   // Live score/win% replace the pre-match projection once a match has kicked off; spread/total stay
   const sHome = live?live.hs:m.proj_home, sAway = live?live.as_:m.proj_away;
@@ -277,35 +290,47 @@ function matchCard(m){
   const readable = c => { const [r,g,b]=rgb(c); return (0.299*r+0.587*g+0.114*b)>150 || (isDark() && (0.299*r+0.587*g+0.114*b)<60) ? 'var(--ink)' : c; };
   const tr = (t,sc,p,c,isFav)=>`<div class="trow${isFav?' fav':''}" style="--c:${readable(c)}">${flag(t,18)}<div class="nm">${t}</div><div class="sc">${sc}</div><div class="wp">${pct(p)}</div></div>`;
   const badge = live ? `<span style="color:${live.final?'var(--muted)':'var(--accent)'};font-weight:700">${live.badge}</span>` : `<span>${koLocal(m)}</span>`;
+  const dash = '<span style="color:var(--muted)">—</span>';
   return `<article class="card">
-    <div class="m-top"><span>${m.venue}</span>${badge}</div>
+    <div class="m-top"><span>${m.venue||''}</span>${badge}</div>
     <div class="m-teams">${tr(m.home,sHome,pHome,hc,hf)}${tr(m.away,sAway,pAway,ac,!hf)}</div>
     <div class="bar" role="img" aria-label="${m.home} ${pct(pHome)}, draw ${pct(pDraw)}, ${m.away} ${pct(pAway)}"><i style="width:${pHome*100}%;background:${hc}"></i><i style="width:${pDraw*100}%;background:var(--draw)"></i><i style="width:${pAway*100}%;background:${ac}"></i></div>
     <div class="drawl"><span>${live?(live.final?'Final score · result':'Live score · win chance'):'Projected score · win chance'}</span><span>Draw ${pct(pDraw)}</span></div>
     <div class="vs">
       <div class="hd"></div><div class="hd r">Gainline${live&&!live.final?' live':''}</div><div class="hd r">Market</div>
-      <div class="lab">Win</div><div class="r">${pct(pHome)} · ${pct(pAway)}</div><div class="r">${pct(mh)} · ${pct(ma)}</div>
-      <div class="lab">Spread</div><div class="r">${fav(m.home,m.away,m.spread)}</div><div class="r">${fav(m.home,m.away,m.mkt_spread)}</div>
+      <div class="lab">Win</div><div class="r">${pct(pHome)} · ${pct(pAway)}</div><div class="r">${hasMkt?`${pct(mh)} · ${pct(ma)}`:dash}</div>
+      <div class="lab">Spread</div><div class="r">${fav(m.home,m.away,m.spread)}</div><div class="r">${m.mkt_spread!=null?fav(m.home,m.away,m.mkt_spread):dash}</div>
       <div class="lab">Total</div><div class="r">${m.total.toFixed(1)}</div><div class="r" style="color:var(--muted)">—</div>
     </div>
   </article>`;
 }
 function projections(){
-  return `<div class="eyebrow">${D.competition} · ${D.round_date}</div><h1 class="h1">${D.round_label}</h1>
-  <p class="sub">Projected score and win chance for each side. Market win % is the bookmaker price with its margin removed.</p>
-  <div class="grid three">${D.matches.map(matchCard).join('')}</div>
-  <p class="note">Market: PA sportsbook, ${D.market_date}. Projections update once final team sheets are confirmed.</p>`;
+  // One section per active competition (22 Nov: Top14/Prem/URC typically overlap most weekends, so the
+  // page shows everything on at once - like a real sports app - rather than picking just one to display).
+  if (!D.rounds?.length) return `<h1 class="h1">Nothing scheduled right now</h1>
+    <p class="sub">No tracked competition has fixtures in the current window. Check back closer to the next round.</p>`;
+  const sections = D.rounds.map(rnd => `
+    <div class="eyebrow">${rnd.competition} · ${rnd.round_label}</div>
+    <div class="grid three">${rnd.matches.map(matchCard).join('')}</div>`).join('<div class="sec"></div>');
+  const anyMkt = D.rounds.some(r => r.matches.some(m => m.mdh != null));
+  return `<h1 class="h1">Matches</h1>
+  <p class="sub">Projected score and win chance for each side. Market win % is the bookmaker price with its margin removed, shown only where a board has been entered.</p>
+  ${sections}
+  <p class="note">${anyMkt ? `Market: manual board, ${D.market_date}.` : 'No market board entered this round - Gainline projections only.'} Projections update once final team sheets are confirmed.</p>`;
 }
 
 let tryTeam='All';
 function tryScorers(){
+  if (!D.tries?.length) return `<h1 class="h1">Anytime try scorer</h1>
+    <p class="sub">Chance each player scores at least one try, with the equivalent odds underneath.</p>
+    <p class="note">No international round active right now - try-scorer odds are Test-only. Check back when one is on.</p>`;
   const have=new Set(D.tries.map(t=>t.team));
   const teams=['All',...have];
   const rows=D.tries.filter(t=>tryTeam==='All'||t.team===tryTeam).sort((a,b)=>b.p-a.p).map(t=>`<div class="row tr">${flag(t.team,16)}
     <div><div class="t1">${t.name}</div><div class="t2" style="text-transform:capitalize">${t.team} · ${t.pos}</div></div>
     <div class="meter" aria-hidden="true"><i style="width:${Math.min(t.p,1)*100}%;background:${tcol(t.team)}"></i></div>
     <div class="big">${pct(t.p)}<small>${t.fair}</small></div></div>`).join('');
-  const roundTeams=new Set(D.matches.flatMap(m=>[m.home,m.away]));
+  const roundTeams=new Set(D.rounds.filter(r=>r.kind==='intl').flatMap(r=>r.matches).flatMap(m=>[m.home,m.away]));
   const pending=[...roundTeams].filter(t=>!have.has(t));
   const note=pending.length?`Based on recent selections. ${pending.join(', ')} ${pending.length>1?'are':'is'} added once team sheets are named.`
                       :'Based on recent selections and this round’s confirmed team sheets.';
@@ -449,7 +474,7 @@ function bets(){
   const tries=B.tries.map(t=>{const d=toDec(t.bet_at); const f=0.05/(d-1)/8;
     return `<div class="row tr">${flag(t.team,16)}<div><div class="t1">${t.name}</div><div class="t2">${t.team} · ${pct(t.p)} to score</div></div>
       <div class="big" style="font-size:16px">${t.bet_at}<small>or longer</small></div><div class="big" style="font-size:15px">${money(BANK*f)}<small>${(f*100).toFixed(1)}%</small></div></div>`}).join('');
-  return `<h1 class="h1">Bets · Round 6</h1>
+  return `<h1 class="h1">Bets · ${B.round}</h1>
   <p class="sub">${B.rules}. Moneylines are draw-no-bet. Stakes are ⅛ Kelly (Lean: 1/16). Lines: ${B.lines}; recheck once final team sheets are confirmed.</p>
   <div class="card bank"><label for="bank">Bankroll</label><input id="bank" type="number" inputmode="decimal" min="0" step="50" value="${BANK}"></div>
   <div class="grid">${cards}</div>

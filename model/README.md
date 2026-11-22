@@ -892,3 +892,17 @@ current/alltime dicts; the template's window-toggle filter is gone) rather than 
 ever cover ~4-5 years under a name that implies far more, even with the "(since 2022)" caveat already there.
 "Current form" (365 days, min 5 games) is the only Rankings view now. verify_site.py/the rest of the pipeline
 needed no changes - confirmed via produce.py/build_site.py/verify_site.py (26/26) and in-browser.
+
+## Rankings: 3-window toggle instead of one fixed year
+Asked for "2 weeks / season / year" windows. rank()'s `days` param became `window` (`'2 Weeks'`, `'Season'`,
+`'Year'`); "Season" uses the exact same Aug 1 (club) / Jan 1 (country) boundary v6.season() already uses
+elsewhere, not a third competing definition of "season." "2 Weeks" drops the games-played floor from 5 to 1 -
+a 14-day window can't realistically clear 5 games for almost anyone, so it's deliberately a noisy, small-
+sample snapshot rather than a stable rate, and the UI note says so.
+Checked Season vs Year weren't accidentally computing the same thing for country (they returned identical
+114-qualifier results at first glance) before trusting it: confirmed it's a real coincidence of the
+international calendar, not a bug - no Test matches are played between the Nov window closing and the next
+Six Nations in Feb, so "since Jan 1" and "since 365 days ago" happen to bound the exact same rows right now.
+Club rankings (which play continuously) correctly show three clearly distinct qualifier counts (1162 / 307 /
+3076). site_rankings() now returns window-nested dicts again (undoing last commit's flattening, for a better
+reason this time - three real windows instead of one misleading one). 26/26 checks pass.

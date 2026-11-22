@@ -1,8 +1,12 @@
 """Club & country player rankings. Builds on grades_produce.py's validated data-driven weights (R2=0.65
 single-match, vs hand weights' -0.79 - see README) but aggregates across games instead of one match.
-"current form" = shrunk mean points-added per 80-minutes-equivalent over the last 365 days of available
-data, empirical-Bayes shrunk toward the position group's mean with k pseudo-(80-min-windows) - same recipe
-tries.py and lineup_value.py already use elsewhere in this repo, for consistency.
+Three windows (23 Nov): "2 Weeks", "Season" (since 1 Aug for clubs, since 1 Jan for country - the same
+season-boundary convention v6.season() already uses elsewhere, not a third competing definition), and "Year"
+(365 days - this is the old, only, "current form" window, just one of three now). Each is shrunk mean points-
+added per 80-minutes-equivalent, empirical-Bayes shrunk toward the position group's mean with k pseudo-(80-
+min-windows) - same recipe tries.py and lineup_value.py already use elsewhere in this repo, for consistency.
+"2 Weeks" drops the games-played floor to 1 (from 5) - a 14-day window genuinely can't clear 5 games for
+almost anyone, so this is deliberately a noisier, smaller-sample snapshot, not a stable rate.
 Minutes-played only exists for the World Rugby sync rows added 21 Nov (wr_stats_sync.py); every older row has
 no minutes field at all, so those are filled to a full 80 - same as the old implicit assumption, before
 minutes existed, that every appearance in player_stats.parquet was a full match. Means a Sep-2026-and-earlier
@@ -46,13 +50,26 @@ def load_graded():
     p['pa'] = sum(p[f] * v for f, v in vals.items()) + 0.5 * p.points
     return p, vals
 
-def rank(p, bucket, days=365, min_games=MIN_GAMES):
+def _season_start(max_date, bucket):
+    """Same boundary v6.season() uses elsewhere - club seasons run Aug-Jun (northern hemisphere leagues
+    dominate what this site tracks), country/Test windows are just the calendar year."""
+    if bucket == 'club':
+        y = max_date.year if max_date.month >= 8 else max_date.year - 1
+        return pd.Timestamp(y, 8, 1)
+    return pd.Timestamp(max_date.year, 1, 1)
+
+WINDOWS = ('2 Weeks', 'Season', 'Year')
+
+def rank(p, bucket, window='Year', min_games=None):
     """club: z-scored within (league, position) - a Top14 prop isn't comparable to a Japan League One prop
-    by raw rate, different competitive pools. country: z-scored within position only (already T1-only, one pool).
-    days=None -> all available history (since 2022-01-01, the data's start - there's no deeper "all-time")."""
+    by raw rate, different competitive pools. country: z-scored within position only (already T1-only, one pool)."""
     x = p[p.bucket == bucket].copy()
     key = ['league', 'grp'] if bucket == 'club' else ['grp']
-    recent = x if days is None else x[x.date >= x.date.max() - pd.Timedelta(days=days)]
+    maxd = x.date.max()
+    since = {'2 Weeks': maxd - pd.Timedelta(days=14), 'Season': _season_start(maxd, bucket),
+            'Year': maxd - pd.Timedelta(days=365)}[window]
+    if min_games is None: min_games = 1 if window == '2 Weeks' else MIN_GAMES
+    recent = x[x.date >= since]
     g = recent.groupby(['player_id'] + key).agg(name=('name', 'last'), team=('team', 'last'),
                                                  n=('pa', 'size'), pa_sum=('pa', 'sum'),
                                                  min_sum=('minutes', 'sum')).reset_index()
@@ -77,18 +94,17 @@ def _format(R):
 def site_rankings():
     """Scoped to the competitions the rest of the site already tracks (Country/Top14/Prem/URC) rather than
     every league in the data (Pro D2, Japan League One, Mitre 10 Cup, etc. are out of scope for this site).
-    "Current form": last 365 days of data, min 5 games.
-    There used to also be an "all-time (since 2022)" window - removed 23 Nov. Checked the raw vendored player
-    data directly (not just our own pipeline): 2022-01-01 is the genuine floor across every one of its 9,241
-    player files, not a limit in how we built player_stats.parquet - structured player-level rugby stats just
-    don't exist publicly further back than that. ~4 years isn't meaningfully "all-time" for a career stat, so
-    rather than keep a misleadingly-named window, it's gone; "current form" is the only view now."""
+    Three windows - see module docstring. (There used to also be an "all-time (since 2022)" window - removed
+    23 Nov after confirming 2022-01-01 is a genuine data floor, not a pipeline limit: structured player-level
+    rugby stats don't exist publicly further back than that in any source checked.)"""
     p, _ = load_graded()
-    R_country = rank(p, 'country')
-    R_club = rank(p, 'club')
-    out = {'Country': _format(R_country)}
-    for full, label in LEAGUE_LABEL.items():
-        out[label] = _format(R_club[R_club.league == full])
+    out = {}
+    for window in WINDOWS:
+        R_country = rank(p, 'country', window=window)
+        R_club = rank(p, 'club', window=window)
+        out[window] = {'Country': _format(R_country)}
+        for full, label in LEAGUE_LABEL.items():
+            out[window][label] = _format(R_club[R_club.league == full])
     return out
 
 if __name__ == '__main__':

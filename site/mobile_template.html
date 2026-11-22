@@ -25,7 +25,7 @@
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--body);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
 .wrap{max-width:1080px;margin:0 auto;padding:0 max(14px,env(safe-area-inset-left)) 0 max(14px,env(safe-area-inset-right))}
-header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+header{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top);padding-bottom:6px}
 .mast{display:flex;align-items:center;gap:10px;height:46px}
 .logo{font:700 24px/1 var(--display);letter-spacing:.02em;text-transform:uppercase}
 .logo span{color:var(--accent)}
@@ -35,7 +35,9 @@ nav::-webkit-scrollbar{display:none}
 nav a{flex:none;font:600 14px/1 var(--display);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-decoration:none;padding:9px 8px 10px;border-bottom:2.5px solid transparent}
 nav a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
 a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
-main{padding:24px 0 calc(28px + env(safe-area-inset-bottom))}
+#main{padding:24px 0 calc(28px + env(safe-area-inset-bottom))}   /* #main, not `main` - .wrap (shared with
+header's own wrapper div) is a class selector and outranks a bare tag selector, so `main{padding:...}` was
+silently overridden to .wrap's 0 0 top/bottom and never actually rendered (found 22 Nov chasing this exact gap) */
 .eyebrow{font:600 11px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:2px}
 .h1{font:700 22px/1.05 var(--display);text-transform:uppercase;margin:0 0 4px;text-wrap:balance}
 .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px;max-width:62ch}

@@ -70,7 +70,10 @@ def grade(p, vals, s=0.5, hist=None, K=K_GRADE_SHRINK):
     p = p.copy()
     p['pa'] = sum(p[f] * v for f, v in vals.items()) + s * p.points.fillna(0)
     p['grp'] = p.position.map(GROUP).fillna('sub_back')
-    match_st = p.groupby('grp').pa.agg(['mean', 'var', 'count'])
+    match_st = p.groupby('grp').pa.agg(['mean', 'var', 'count']).fillna({'var': 0.0})   # pandas' sample var of
+    # a single observation is NaN, not 0 - a position group with exactly 1 player in this match (common: some
+    # groups are a single starter per side) would otherwise poison the whole shrunk blend below with NaN. 0 is
+    # the right default here: with n this small the K=10 historical shrinkage already dominates regardless.
     if hist is not None:
         n = match_st['count']
         mean = (n * match_st['mean'] + K * hist['mean']) / (n + K)

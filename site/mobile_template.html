@@ -376,19 +376,74 @@ function liveGradesSection(){
       <div class="big" style="font-size:17px">${p.pa>0?'+':''}${p.pa.toFixed(1)}<small>pts live</small></div></div>`).join('');
   return `<div class="sec">Live now</div><div class="list" style="margin-bottom:14px">${rows}</div>`;
 }
+/* ---- Grades match browser: "go back to any game we have data on" (23 Nov) - grades_archive.py publishes
+one small JSON per gradeable match (~5,000 of them) rather than embedding all of them in the page (would be
+tens of MB). The index (match_id/date/teams/scores) and each match's grades are fetched lazily, only when the
+picker is actually opened / a match actually picked - the default view (most recent high-profile match) costs
+nothing extra. The results list updates via a targeted DOM patch, not the normal full render(), so typing in
+the search box doesn't lose focus every keystroke the way replacing all of #main would. ---- */
+let gMatch=null, gPickerOpen=false, gSearch='', gArchiveIndex=null;
+const gArchiveData={};
+async function loadArchiveIndex(){
+  if (gArchiveIndex) return gArchiveIndex;
+  try { gArchiveIndex = await (await fetch('__ARCHIVE_BASE__grades_archive/index.json')).json(); }
+  catch(e){ gArchiveIndex = []; }
+  return gArchiveIndex;
+}
+function gResultsHTML(){
+  if (!gArchiveIndex) return '<p class="note">Loading matches…</p>';
+  const q = gSearch.trim().toLowerCase();
+  const hits = (q ? gArchiveIndex.filter(m=>m.home.toLowerCase().includes(q)||m.away.toLowerCase().includes(q)) : gArchiveIndex).slice(0,40);
+  if (!hits.length) return '<p class="note">No matches found.</p>';
+  return hits.map(m=>`<button type="button" class="row" style="width:100%;text-align:left;border:0;background:none;font:inherit;cursor:pointer" data-gmatch="${m.match_id}">
+    <div style="min-width:0"><div class="t1">${m.home} ${m.home_score}–${m.away_score} ${m.away}</div><div class="t2">${m.competition} · ${m.date}</div></div>
+  </button>`).join('');
+}
+async function pickMatch(mid){
+  if (!gArchiveData[mid]){
+    try { gArchiveData[mid] = await (await fetch(`__ARCHIVE_BASE__grades_archive/${mid}.json`)).json(); }
+    catch(e){ return; }
+  }
+  gMatch = mid; gPickerOpen = false; render();
+}
+document.getElementById('main').addEventListener('toggle', e=>{
+  if (e.target.id!=='gpicker') return;
+  gPickerOpen = e.target.open;
+  if (!gPickerOpen) return;
+  const el = document.getElementById('gresults'); if (!el) return;
+  if (gArchiveIndex) { el.innerHTML = gResultsHTML(); return; }   // already cached - show it immediately
+  el.innerHTML = '<p class="note">Loading matches…</p>';   // native toggle doesn't trigger our render(), so
+  // without this the results area would just stay empty (whatever it last rendered as) until the fetch below resolves
+  loadArchiveIndex().then(()=>{ el.innerHTML = gResultsHTML(); });
+}, true);
+document.getElementById('main').addEventListener('input', e=>{
+  if (e.target.id==='gsearch'){ gSearch = e.target.value; const el=document.getElementById('gresults'); if(el) el.innerHTML=gResultsHTML(); }
+});
+/* ---- end grades match browser ---- */
+
 function grades(){
-  const teams=['All',...new Set(D.grades.map(g=>g.team))];
+  const browsing = gMatch && gArchiveData[gMatch];
+  const label = browsing ? gArchiveData[gMatch].match : D.grades_match;
+  const playerList = browsing ? gArchiveData[gMatch].players : D.grades;
+  const teams=['All',...new Set(playerList.map(g=>g.team))];
   const vals=Object.entries(D.grade_values).filter(([k])=>k!=='points').sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))
     .map(([k,v])=>`<span>${k.replace(/_/g,' ')} <b>${v>0?'+':''}${k==='metres_carried'?(v*10).toFixed(1)+'/10m':v.toFixed(2)}</b></span>`).join('');
-  const rows=D.grades.filter(g=>gTeam==='All'||g.team===gTeam).map(g=>`<div class="row gd"><div class="grade" style="background:${gcol(g.grade)}">${g.grade}</div>
+  const rows=playerList.filter(g=>gTeam==='All'||g.team===gTeam).map(g=>`<div class="row gd"><div class="grade" style="background:${gcol(g.grade)}">${g.grade}</div>
     <div><div class="t1">${g.name}</div><div class="t2"><span style="text-transform:capitalize">${CODE[g.team]||g.team} · ${g.pos}</span>${g.key?' · '+g.key:''}</div></div>
     <div class="big" style="font-size:17px">${g.pa>0?'+':''}${g.pa.toFixed(1)}<small>pts</small></div></div>`).join('');
-  const rc=D.recap, hl=rc?.highlights?.map(h=>`<p style="margin:0 0 6px">${h}</p>`).join('')||'';
+  const rc=!browsing?D.recap:null, hl=rc?.highlights?.map(h=>`<p style="margin:0 0 6px">${h}</p>`).join('')||'';
   return `<h1 class="h1">Player grades</h1>
-  <p class="sub">${D.grades_match}. Points added = scoring plus what every other action adds to the margin. Grade ranks it by position across Tests: 60 average, 80+ elite.</p>
+  <p class="sub">${label}. Points added = scoring plus what every other action adds to the margin. Grade ranks it by position across Tests: 60 average, 80+ elite.</p>
+  ${browsing?`<button type="button" data-gback="1" style="margin-bottom:10px">← Back to current</button>`:''}
   ${liveGradesSection()}
   ${rc?`<div class="card prose" style="margin-bottom:12px">${hl}</div>`:''}
   <details class="card vals"><summary>What each action is worth</summary><div class="values">${vals}</div></details>
+  <details class="card vals" id="gpicker" ${gPickerOpen?'open':''}><summary>Browse another match</summary>
+    <div style="padding:0 12px 12px">
+      <input type="search" id="gsearch" value="${gSearch}" placeholder="Search by team name" style="width:100%;box-sizing:border-box;padding:8px 10px;margin-bottom:8px;border:1px solid var(--line);border-radius:8px;background:var(--soft);color:var(--ink);font:inherit">
+      <div class="list" id="gresults">${gPickerOpen?gResultsHTML():''}</div>
+    </div>
+  </details>
   <div class="filters" role="group" aria-label="Team">${teams.map(t=>`<button type="button" aria-pressed="${t===gTeam}" data-gteam="${t}">${t!=='All'?flag(t,11):''}${t}</button>`).join('')}</div>
   <div class="list">${rows}</div>`;
 }
@@ -498,6 +553,8 @@ function render(){
 }
 document.getElementById('main').addEventListener('change',e=>{if(e.target.id==='bank'){BANK=Math.max(0,+e.target.value||0);try{localStorage.setItem('gl_bank',BANK);}catch(_){}render();}});
 document.getElementById('main').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.gmatch){ pickMatch(b.dataset.gmatch); return; }   // async - pickMatch calls render() itself once fetched
+  if(b.dataset.gback){ gMatch=null; render(); return; }
   if(b.dataset.team)tryTeam=b.dataset.team; if(b.dataset.rat)ratLg=b.dataset.rat; if(b.dataset.gteam)gTeam=b.dataset.gteam; if(b.dataset.rklg)rkLg=b.dataset.rklg; if(b.dataset.rkwin)rkWin=b.dataset.rkwin; if(b.dataset.tbl)tblComp=b.dataset.tbl; render();});
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0);});
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',render);

@@ -9,6 +9,8 @@ name: Rebuild site
 # model is built on (see CLAUDE.md/README).
 # Always computes everything, but only commits/pushes if the output actually changed and verify_site.py's
 # checks all pass - a quiet day (nothing new to sync, same fixtures as last run) is a clean no-op.
+# Also rebuilds grades_archive/ every run (23 Nov) - one small JSON per match we have full player-stats data
+# for (~4,700 of them), so the Grades tab's match picker can browse any game, not just the current round.
 
 on:
   schedule:
@@ -45,6 +47,10 @@ jobs:
       - name: Rebuild site.json (auto-detects this week's fixtures + any new player stats)
         working-directory: model
         run: python3 produce.py
+
+      - name: Rebuild grades_archive/ (every match we have full player-stats data for, ~165-210s)
+        working-directory: model
+        run: python3 grades_archive.py
 
       - name: Rebuild site/gainline.html + index.html
         run: python3 build_site.py

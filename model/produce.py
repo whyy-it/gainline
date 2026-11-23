@@ -233,7 +233,10 @@ def main():
     d['backtest'].update(live_backtest())
     if need_intl:
         d['probit'] = dict(a=fit['intl']['a'], b=fit['intl']['b'], sigma=fit['intl']['sigma'])
-    json.dump(d, open(OUT, 'w'), default=float)
+    # allow_nan=False: a bare NaN serializes to the literal token `NaN` by default, non-standard JSON that
+    # browsers' JSON.parse rejects outright - silently broke the grades archive this same way (23 Nov, see
+    # grades_archive.py), so fail loudly here at build time instead of shipping something that'll break client-side.
+    json.dump(d, open(OUT, 'w'), default=float, allow_nan=False)
     for rnd in rounds:
         print(f"-- {rnd['competition']} ({rnd['round_label']}) --")
         for m in rnd['matches']:

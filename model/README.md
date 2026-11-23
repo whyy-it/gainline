@@ -906,3 +906,41 @@ Six Nations in Feb, so "since Jan 1" and "since 365 days ago" happen to bound th
 Club rankings (which play continuously) correctly show three clearly distinct qualifier counts (1162 / 307 /
 3076). site_rankings() now returns window-nested dicts again (undoing last commit's flattening, for a better
 reason this time - three real windows instead of one misleading one). 26/26 checks pass.
+
+## Grades: browse any match we have data for, not just the current one
+Asked to "go back to any game we have data on and see the player ratings" - until now grades_produce.py only
+ever graded one hand-picked recent match. Embedding every gradeable match's grades directly in site.json
+isn't viable (~4,700 matches x ~46 players averages ~227k rows - tens of MB inlined into every single page
+load, for a feature most visits never open). Built model/grades_archive.py instead: publishes one small JSON
+per match to repo-root `grades_archive/<match_id>.json` (git/GitHub Pages serve thousands of small static
+files fine, same as any other asset) plus a lightweight index (match_id/date/teams/scores/competition), both
+fetched lazily by the client - only when the Grades tab's "Browse another match" picker is actually opened,
+and only the one ~3-5KB file for a match actually selected. The default view (today's auto-picked match)
+costs nothing extra.
+Two real bugs caught building this:
+- A latent bug in grade() itself, not new today: a position group with exactly one player in a match gives
+  pandas `.var()` of a single value as NaN, not 0 - poisoning the whole shrunk-variance blend (K=10 toward the
+  historical baseline, see 22 Nov) with NaN for any match where some group was that sparse. Never surfaced in
+  the single hand-picked match grades_produce.py always used (apparently never hit this edge case), but hit it
+  immediately computing all ~4,700. Fixed: treat a single-observation var as 0 (the K=10 shrinkage already
+  dominates at n=1 regardless).
+- 21 of 9,666 team_match_stats.parquet rows have no `comp` recorded. A missing VALUE (not a missing key), so
+  `dict.get(key, fallback)` didn't catch it - and a bare float NaN serializes to the literal JSON token `NaN`
+  under Python's default json.dumps, which is NOT valid JSON (the spec has no NaN) - so every fetch of an
+  affected file silently failed client-side with no visible error, caught only by actually testing the picker
+  in a browser, not by eyeballing the generated files. Fixed the immediate cause (treat a NaN comp as '') and
+  added `allow_nan=False` to every json.dump/dumps in grades_archive.py AND produce.py's own site.json write,
+  so this whole bug class fails loudly at build time from now on instead of shipping broken JSON silently.
+Regenerates the full archive every run (~165-320s, varies with machine load) rather than only new matches -
+grade_values/the historical baseline are refit on all current data each time, so an old match's grade can
+drift slightly as the model improves; recomputing avoids ever serving a file computed under a stale fit.
+Lives at repo root, not under site/, because index.html (what GitHub Pages actually serves) is there too -
+site/gainline.html and site/gainline_private.html are one directory deeper, so build_site.py now substitutes
+a new `__ARCHIVE_BASE__` placeholder per destination ('' for index.html, '../' for the two under site/) -
+confirmed both resolve correctly via curl before trusting it in a real browser.
+Tested the actual click-through in a browser, not just the generated files: opened the picker, searched
+"Toulouse", confirmed the results list updates via a targeted DOM patch (not the page's normal full re-
+render) so the search input doesn't lose focus every keystroke, picked a real club match, confirmed the
+grades view correctly swaps (team badges via flag()'s existing club fallback, real computed grades, "Back to
+current" correctly returns to today's match). verify_site.py got 4 new checks (index size, index row shape,
+a sample match file exists and parses, its grades are all in the valid 30-99 range). 30/30 checks pass.

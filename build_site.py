@@ -10,6 +10,11 @@ data instead goes to site/gainline_private.html, a local-only file (gitignored, 
 itself now is) for viewing the Bets tab. mobile_template.html's JS only shows the Bets nav link/section when
 D.betsTab is actually present, so one template correctly renders both variants.
 
+__ARCHIVE_BASE__ (23 Nov): grades_archive.py publishes its per-match JSON files to repo-root `grades_archive/`
+(next to index.html, since that's the file GitHub Pages actually serves) - but site/gainline.html and
+site/gainline_private.html live one directory deeper, so the SAME relative fetch path can't work for both.
+This placeholder is substituted per destination: empty for index.html, '../' for the two files under site/.
+
 Run from the repo root: python3 build_site.py
 """
 import pathlib, json
@@ -24,12 +29,13 @@ def build():
 
     public = json.loads(data_raw)
     public.pop('betsTab', None)
-    out_public = tpl.replace('__DATA__', json.dumps(public)).replace('__TEAMJS__', teamjs)
-    for dest in (ROOT / 'site' / 'gainline.html', ROOT / 'index.html'):
-        dest.write_text(out_public)
-        print(f'wrote {dest.relative_to(ROOT)} ({len(out_public)} bytes) - public, no betting content')
+    public_tpl = tpl.replace('__DATA__', json.dumps(public)).replace('__TEAMJS__', teamjs)
+    for dest, base in ((ROOT / 'site' / 'gainline.html', '../'), (ROOT / 'index.html', '')):
+        out = public_tpl.replace('__ARCHIVE_BASE__', base)
+        dest.write_text(out)
+        print(f'wrote {dest.relative_to(ROOT)} ({len(out)} bytes) - public, no betting content')
 
-    out_private = tpl.replace('__DATA__', data_raw).replace('__TEAMJS__', teamjs)
+    out_private = tpl.replace('__DATA__', data_raw).replace('__TEAMJS__', teamjs).replace('__ARCHIVE_BASE__', '../')
     PRIVATE_OUT.write_text(out_private)
     print(f'wrote {PRIVATE_OUT.relative_to(ROOT)} ({len(out_private)} bytes) - PRIVATE, gitignored, not committed')
 

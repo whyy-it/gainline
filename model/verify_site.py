@@ -133,5 +133,24 @@ check('Club leagues complete (Top 14 14, Prem 10, URC 16)', lg == {'URC': 16, 'T
 check('Super Rugby 11 teams, centred', len(d['sr']) == 11 and abs(sum(x['rating'] for x in d['sr'])) < 0.1)
 check('Test ratings sorted', [x['rating'] for x in d['intl']] == sorted([x['rating'] for x in d['intl']], reverse=True))
 
+# 7. Grades archive (23 Nov - "go back to any game we have data on" - one JSON per gradeable match, not
+# embedded in site.json; spot-checks the index and a sample file rather than all ~4,700 of them)
+arc = pathlib.Path('../grades_archive')
+idx_path = arc / 'index.json'
+if idx_path.exists():
+    idx = json.loads(idx_path.read_text())
+    check('Grades archive: index has a plausible number of matches', len(idx) > 1000, f'{len(idx)} entries')
+    sample = idx[0]
+    check('Grades archive: index rows have the fields the picker needs',
+          all(k in sample for k in ('match_id', 'date', 'home', 'away', 'home_score', 'away_score', 'competition')))
+    f = arc / f"{sample['match_id']}.json"
+    check(f"Grades archive: sample match file exists ({sample['match_id']}.json)", f.exists())
+    if f.exists():
+        mdata = json.loads(f.read_text())
+        check('Grades archive: sample match file has players with real grades', len(mdata.get('players', [])) > 0
+              and all(30 <= p['grade'] <= 99 for p in mdata['players']))
+else:
+    print('SKIP Grades archive checks (grades_archive/ not built - run grades_archive.py)')
+
 print('\n%d checks failed' % len(fails) if fails else '\nAll checks passed')
 sys.exit(1 if fails else 0)

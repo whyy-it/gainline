@@ -20,7 +20,7 @@ and if no model edge survives, find situational angles that do. Models in scope:
 ## Setup
 `bash setup.sh` (venv, deps, re-clones seanyboi/rugbydata for player data, creates .env). Then put the key in `.env`.
 All scripts run from `model/` (paths are relative: `../data`, `../matches.parquet`).
-Sanity check first: `cd model && python3 verify_site.py` → 26/26 pass.
+Sanity check first: `cd model && python3 verify_site.py` → 30/30 pass.
 
 ## Layout
 - `model/` — everything. Read `model/README.md` first: it is the full decision log (what was tried, kept, rejected, and why).
@@ -29,7 +29,9 @@ Sanity check first: `cd model && python3 verify_site.py` → 26/26 pass.
   - Super Rugby: `sr.py`. Try scorer: `tries.py` (+ `tries_calib.json`). Grades: `grades.py`.
   - Production: `produce.py` → `site.json` (`rounds`: one entry per currently-active competition, auto-
     detected by `auto_rounds.py` from ESPN - no more hand-maintained fixture list, see README 22 Nov);
-    `bets.py` (Bets tab rules, optional per-match market data); `verify_site.py` (26 checks).
+    `bets.py` (Bets tab rules, optional per-match market data); `verify_site.py` (30 checks);
+    `grades_archive.py` (one JSON per gradeable match, ~4,700 of them, published to repo-root `grades_archive/`
+    so the Grades tab can browse any game, not just the current round).
   - Odds: `odds_pull.py` (Odds API historical closing lines, cached, `--estimate`, `--budget`) → `odds_hist.csv`;
     `backtest.py` (model vs market, bets rule, bootstrap vs 10% bar, `--books`); `odds_log.csv` + `log_round.py` (forward log).
   - `preds_oos.csv` — 2,320 out-of-sample predictions since 2023 to join to odds.
